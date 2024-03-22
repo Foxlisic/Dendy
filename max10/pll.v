@@ -3,13 +3,14 @@ module pll
 (
     input       clk,
     output wire m25,
+    output wire m100,
     output      locked
 );
 
 altpll  altpll_component
 (
     .inclk          ({1'b0, clk}),
-    .clk            ({m25}),
+    .clk            ({m100, m25}),
     .locked         (locked),
     .activeclock    (),
     .areset         (1'b0),
@@ -61,6 +62,11 @@ altpll_component.clk0_divide_by     = 4,
 altpll_component.clk0_duty_cycle    = 50,
 altpll_component.clk0_phase_shift   = "0",
 
+altpll_component.clk1_multiply_by   = 1,
+altpll_component.clk1_divide_by     = 1,
+altpll_component.clk1_duty_cycle    = 50,
+altpll_component.clk1_phase_shift   = "0",
+
 altpll_component.port_activeclock   = "PORT_UNUSED",
 altpll_component.port_areset        = "PORT_UNUSED",
 altpll_component.port_clkbad0       = "PORT_UNUSED",
@@ -88,7 +94,7 @@ altpll_component.port_scanwrite     = "PORT_UNUSED",
 altpll_component.port_phasecounterselect = "PORT_UNUSED",
 altpll_component.port_clk0          = "PORT_USED",
 altpll_component.port_clkena0       = "PORT_UNUSED",
-altpll_component.port_clk1          = "PORT_UNUSED",
+altpll_component.port_clk1          = "PORT_USED",
 altpll_component.port_clkena1       = "PORT_UNUSED",
 altpll_component.port_clk2          = "PORT_UNUSED",
 altpll_component.port_clkena2       = "PORT_UNUSED",
