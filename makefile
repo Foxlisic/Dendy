@@ -1,6 +1,16 @@
-all:
+VLIB=/usr/share/verilator/include
+
+all: app
+	./tb
+ica:
 	iverilog -g2005-sv -DICARUS=1 -o tb.qqq tb.v nes.v
 	vvp tb.qqq >> /dev/null
+app: ver
+	g++ -o tb -I$(VLIB) $(VLIB)/verilated.cpp tb.cc obj_dir/Vnes__ALL.a -lSDL2
+	strip tb
+ver:
+	verilator -cc nes.v
+	cd obj_dir && make -f Vnes.mk
 vcd:
 	gtkwave tb.vcd
 wave:
