@@ -204,6 +204,7 @@ public:
 		mod_nes->clock = 1; mod_nes->eval();
 
 		vga(mod_ppu->HS, mod_ppu->VS, 65536*(mod_ppu->R << 4) + 256*(mod_ppu->G << 4) + (mod_ppu->B << 4));
+		//vga(mod_ppu->HS, mod_ppu->VS, 65536*((mod_ppu->R & 12) << 4) + 256*((mod_ppu->G & 12) << 4) + ((mod_ppu->B & 12) << 4));
 	}
 };
 

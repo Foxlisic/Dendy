@@ -1,10 +1,10 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module mem_ram (clock, address_a, address_b, data_a, data_b, wren_a, wren_b, q_a, q_b);
+module mem_chr (clock, address_a, address_b, data_a, data_b, wren_a, wren_b, q_a, q_b);
 input    clock;
-input    [10:0] address_a;
-input    [10:0] address_b;
+input    [11:0] address_a;
+input    [11:0] address_b;
 input    [ 7:0] data_a;
 input    [ 7:0] data_b;
 output   [ 7:0] q_a;
@@ -42,11 +42,11 @@ defparam
     altsyncram_component.clock_enable_output_a    = "BYPASS",
     altsyncram_component.clock_enable_output_b    = "BYPASS",
     altsyncram_component.indata_reg_b             = "CLOCK0",
-    altsyncram_component.init_file                = "mem_ram.mif",
+    altsyncram_component.init_file                = "mem_chr.mif",
     altsyncram_component.intended_device_family   = "MAX 10",
     altsyncram_component.lpm_type                 = "altsyncram",
-    altsyncram_component.numwords_a               = 2048,
-    altsyncram_component.numwords_b               = 2048,
+    altsyncram_component.numwords_a               = 4096,
+    altsyncram_component.numwords_b               = 4096,
     altsyncram_component.operation_mode           = "BIDIR_DUAL_PORT",
     altsyncram_component.outdata_aclr_a           = "NONE",
     altsyncram_component.outdata_aclr_b           = "NONE",
@@ -57,8 +57,8 @@ defparam
     altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
     altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_WITH_NBE_READ",
     altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_WITH_NBE_READ",
-    altsyncram_component.widthad_a                = 11,
-    altsyncram_component.widthad_b                = 11,
+    altsyncram_component.widthad_a                = 12,
+    altsyncram_component.widthad_b                = 12,
     altsyncram_component.width_a                  = 8,
     altsyncram_component.width_b                  = 8,
     altsyncram_component.width_byteena_a          = 1,

@@ -1,7 +1,7 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module mem_ram (clock, address_a, address_b, data_a, data_b, wren_a, wren_b, q_a, q_b);
+module mem_vram (clock, address_a, address_b, data_a, data_b, wren_a, wren_b, q_a, q_b);
 input    clock;
 input    [10:0] address_a;
 input    [10:0] address_b;
@@ -42,7 +42,7 @@ defparam
     altsyncram_component.clock_enable_output_a    = "BYPASS",
     altsyncram_component.clock_enable_output_b    = "BYPASS",
     altsyncram_component.indata_reg_b             = "CLOCK0",
-    altsyncram_component.init_file                = "mem_ram.mif",
+    altsyncram_component.init_file                = "mem_vram.mif",
     altsyncram_component.intended_device_family   = "MAX 10",
     altsyncram_component.lpm_type                 = "altsyncram",
     altsyncram_component.numwords_a               = 2048,

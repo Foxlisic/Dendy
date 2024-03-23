@@ -14,9 +14,9 @@ module ppu
     output reg  [ 7:0]  ppu_out,
     output reg          ppu_we,
     // VGA OUT
-    output      [ 3:0]  R,
-    output      [ 3:0]  G,
-    output      [ 3:0]  B,
+    output reg  [ 3:0]  R,
+    output reg  [ 3:0]  G,
+    output reg  [ 3:0]  B,
     output              HS,
     output              VS
 );
@@ -31,18 +31,25 @@ assign HS = X  < (hzb + hzv + hzf); // NEG.
 assign VS = Y  < (vtb + vtv + vtf); // NEG.
 // ---------------------------------------------------------------------
 // Позиция луча в кадре и максимальные позиции (x,y)
-reg  [10:0] X = 0;
-reg  [ 9:0] Y = 0;
+reg  [10:0] X    = 0;
+reg  [ 9:0] Y    = 0;
 wire        xmax = (X == hzw - 1);
 wire        ymax = (Y == vtw - 1);
 wire [11:0] x    = (X - hzb) - 48;  // 48=2x24; 24=16[бордер]+8[предзагрузка]
 wire [10:0] y    = (Y - vtb);
 
 // ---------------------------------------------------------------------
-wire [ 1:0] tilepage = x[9] ^ y[9];
-wire        chrpage  = 1'b1;
-reg  [ 3:0] bgcolor;
+wire [ 1:0] tilepage = mappage ^ x[9] ^ y[9];
 reg  [ 7:0] char, attr;
+
+// Выбранная страница
+reg         chrpage; // фона в CHR-ROM
+reg         mappage; // тайловой карты
+
+// Фоновый цвет
+reg  [ 3:0] bgcolor;
+
+// Палитры фона и спрайтов
 reg  [ 6:0] palbg[16];
 
 // Номер цветового тайла 2x2
@@ -86,24 +93,26 @@ wire [11:0] outcolor =
 always @(posedge clock)
 if (reset_n == 1'b0) begin
 
-    ppu_we <= 1'b0;
+    ppu_we  <= 1'b0;
+    chrpage <= 1'b1;
+    mappage <= 1'b0;
 
     palbg[0]  <= 6'h0F;
     palbg[1]  <= 6'h20;
     palbg[2]  <= 6'h10;
     palbg[3]  <= 6'h00;
 
-    palbg[4]  <= 6'h0F;
+    // palbg[4]  <= 6'h0F;
     palbg[5]  <= 6'h1A;
     palbg[6]  <= 6'h27;
     palbg[7]  <= 6'h07;
 
-    palbg[8]  <= 6'h0F;
+    // palbg[8]  <= 6'h0F;
     palbg[9]  <= 6'h27;
     palbg[10] <= 6'h17;
     palbg[11] <= 6'h07;
 
-    palbg[12] <= 6'h0F;
+    // palbg[12] <= 6'h0F;
     palbg[13] <= 6'h20;
     palbg[14] <= 6'h10;
     palbg[15] <= 6'h21;
