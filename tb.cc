@@ -25,7 +25,7 @@ protected:
     Vppu*   mod_ppu;
 
     int     x, y, _hs, _vs;
-    uint8_t vram[2048], chrom[8192], ram[2048], prg[32768];
+    uint8_t mem_ppu[16384], mem[65536];
 
 public:
 
@@ -59,11 +59,19 @@ public:
         frame_length     = 1000 / (fps ? fps : 1);
         frame_prev_ticks = SDL_GetTicks();
 
-        FILE* fp = fopen("out/record.ppm", "w");
-        if (fp) fclose(fp);
+        FILE* fp;
+
+        fp = fopen("out/record.ppm", "w"); if (fp) fclose(fp);
+        fp = fopen("ppu.bin", "rb"); if (fp) { fread(mem_ppu, 1, 16384, fp); fclose(fp); }
 
         mod_nes = new Vnes;
         mod_ppu = new Vppu;
+
+        // Сброс процессора и PPU
+        mod_ppu->reset_n = 0;
+        mod_ppu->clock = 0; mod_ppu->eval();
+        mod_ppu->clock = 1; mod_ppu->eval();
+        mod_ppu->reset_n = 1;
     }
 
     // Ожидание событий
@@ -183,6 +191,9 @@ public:
 
 	// Основной обработчик (TOP-уровень)
 	void tick() {
+
+        // Чтение или запись в память видеопроцессора
+        mod_ppu->ppu_in = mem_ppu[mod_ppu->ppu_addr];
 
 		// Обработка PPU такта
 		mod_ppu->clock = 0; mod_ppu->eval();
