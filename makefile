@@ -6,11 +6,13 @@ ica:
 	iverilog -g2005-sv -DICARUS=1 -o tb.qqq tb.v nes.v
 	vvp tb.qqq >> /dev/null
 app: ver
-	g++ -o tb -I$(VLIB) $(VLIB)/verilated.cpp tb.cc obj_dir/Vnes__ALL.a -lSDL2
+	g++ -o tb -I$(VLIB) $(VLIB)/verilated.cpp tb.cc obj_dir/Vnes__ALL.a obj_dir/Vppu__ALL.a -lSDL2
 	strip tb
 ver:
 	verilator -cc nes.v
+	verilator -cc ppu.v
 	cd obj_dir && make -f Vnes.mk
+	cd obj_dir && make -f Vppu.mk
 vcd:
 	gtkwave tb.vcd
 wave:

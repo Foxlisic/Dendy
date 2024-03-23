@@ -2,12 +2,11 @@
 
 #include <stdlib.h>
 #include "obj_dir/Vnes.h"
+#include "obj_dir/Vppu.h"
 
 #include <SDL2/SDL.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-Vnes*   mod_nes;
 
 class App {
 protected:
@@ -22,7 +21,11 @@ protected:
     Uint32  frame_length;
     Uint32  frame_prev_ticks;
 
+    Vnes*   mod_nes;
+    Vppu*   mod_ppu;
+
     int     x, y, _hs, _vs;
+    uint8_t vram[2048], chrom[8192], ram[2048], prg[32768];
 
 public:
 
@@ -46,7 +49,7 @@ public:
         }
 
         SDL_ClearError();
-        sdl_window          = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
+        sdl_window          = SDL_CreateWindow("DENDY: НОВАЯ РЕАЛЬНОСТЬ", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
         sdl_renderer        = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC);
         screen_buffer       = (Uint32*) malloc(_width * _height * sizeof(Uint32));
         sdl_screen_texture  = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, _width, _height);
@@ -58,6 +61,9 @@ public:
 
         FILE* fp = fopen("out/record.ppm", "w");
         if (fp) fclose(fp);
+
+        mod_nes = new Vnes;
+        mod_ppu = new Vppu;
     }
 
     // Ожидание событий
@@ -142,14 +148,14 @@ public:
 
         // Отслеживание изменений HS/VS
         if (_hs == 0 && hs == 1) { x = 0; y++; }
-        if (_vs == 1 && vs == 0) { x = 0; y = 0; saveframe(); }
+        if (_vs == 0 && vs == 1) { x = 0; y = 0; saveframe(); }
 
         // Сохранить предыдущее значение
         _hs = hs;
         _vs = vs;
 
         // Вывод на экран
-        pset(x - 48, y - 35, color);
+        pset(x - 48, y - 33, color);
     }
 
     // Сохранение фрейма
@@ -178,11 +184,15 @@ public:
 	// Основной обработчик (TOP-уровень)
 	void tick() {
 
+		// Обработка PPU такта
+		mod_ppu->clock = 0; mod_ppu->eval();
+		mod_ppu->clock = 1; mod_ppu->eval();
+
 		// Обработка CPU такта
 		mod_nes->clock = 0; mod_nes->eval();
 		mod_nes->clock = 1; mod_nes->eval();
 
-		// vga(mod_vga->HS, mod_vga->VS, 65536*(mod_vga->R << 4) + 256*(mod_vga->G << 4) + (mod_vga->B << 4));
+		vga(mod_ppu->HS, mod_ppu->VS, 65536*(mod_ppu->R << 4) + 256*(mod_ppu->G << 4) + (mod_ppu->B << 4));
 	}
 };
 
@@ -194,11 +204,8 @@ int main(int argc, char **argv) {
     App* app = new App(640, 480);
     // -------------------------------------
 
-    mod_nes = new Vnes;
-
     while (app->main()) {
-
-        for (int i = 0; i < 70000; i++)
+        for (int i = 0; i < 150000; i++)
             app->tick();
     }
 
