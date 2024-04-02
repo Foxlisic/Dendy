@@ -1,13 +1,14 @@
 VLIB=/usr/share/verilator/include
 
-all: app
-	./tb
+#all: ica
+all: apx
 ica:
-	iverilog -g2005-sv -DICARUS=1 -o tb.qqq tb.v nes.v
+	iverilog -g2005-sv -DICARUS=1 -o tb.qqq tb.v nes.v ppu.v
 	vvp tb.qqq >> /dev/null
-app: ver
+apx: ver
 	g++ -o tb -I$(VLIB) $(VLIB)/verilated.cpp tb.cc obj_dir/Vnes__ALL.a obj_dir/Vppu__ALL.a -lSDL2
 	strip tb
+	./tb
 ver:
 	verilator -cc nes.v
 	verilator -cc ppu.v

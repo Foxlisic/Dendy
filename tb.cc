@@ -37,9 +37,9 @@ public:
 
         _scale   = scale;
         _width   = w;
-		 width   = w * scale;
+         width   = w * scale;
         _height  = h;
-		 height  = h * scale;
+         height  = h * scale;
         frame_id = 0;
 
         _hs = 1; _vs = 0; x = 0; y = 0;
@@ -69,8 +69,8 @@ public:
 
         // Сброс процессора и PPU
         mod_ppu->reset_n = 0;
-        mod_ppu->clock = 0; mod_ppu->eval();
         mod_ppu->clock = 1; mod_ppu->eval();
+        mod_ppu->clock = 0; mod_ppu->eval();
         mod_ppu->reset_n = 1;
     }
 

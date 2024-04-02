@@ -7,7 +7,7 @@ module ppu
     input       [ 7:0]  in,
     input               rd,
     input               we,
-    output              lock_cpu,       // Разрешение работы CPU
+    output  reg         lock_cpu,       // Разрешение работы CPU
     // MEMORY
     output  reg [13:0]  ppu_addr,
     input       [ 7:0]  ppu_in,
@@ -38,6 +38,8 @@ wire        ymax = (Y == vtw - 1);
 wire [11:0] x    = (X - hzb) - 48;  // 48=2x24; 24=16[бордер]+8[предзагрузка]
 wire [10:0] y    = (Y - vtb);
 
+// ---------------------------------------------------------------------
+reg  [ 1:0] cck;
 // ---------------------------------------------------------------------
 wire [ 1:0] tilepage = mappage ^ x[9] ^ y[9];
 reg  [ 7:0] char, attr;
@@ -90,32 +92,37 @@ wire [11:0] outcolor =
     cin == 6'h38 ?  12'hFEA : cin == 6'h39 ?  12'hEFA : cin == 6'h3A ?  12'hAFB : cin == 6'h3B ?  12'hBFC :
     cin == 6'h3C ?  12'h9FF : cin == 6'h3D ?  12'h000 : cin == 6'h3E ?  12'h000 :                 12'h000;
 
-always @(posedge clock)
+always @(negedge clock)
 if (reset_n == 1'b0) begin
 
-    ppu_we  <= 1'b0;
-    chrpage <= 1'b1;
-    mappage <= 1'b0;
+    cck         <= 1'b0;
+    ppu_we      <= 1'b0;
+    chrpage     <= 1'b1;
+    mappage     <= 1'b0;
+    lock_cpu    <= 1'b0;
 
-    palbg[0]  <= 6'h0F;
-    palbg[1]  <= 6'h20;
-    palbg[2]  <= 6'h10;
-    palbg[3]  <= 6'h00;
+    X <= 0;
+    Y <= 0;
+
+    palbg[0]    <= 6'h0F;
+    palbg[1]    <= 6'h20;
+    palbg[2]    <= 6'h10;
+    palbg[3]    <= 6'h00;
 
     // palbg[4]  <= 6'h0F;
-    palbg[5]  <= 6'h1A;
-    palbg[6]  <= 6'h27;
-    palbg[7]  <= 6'h07;
+    palbg[5]    <= 6'h1A;
+    palbg[6]    <= 6'h27;
+    palbg[7]    <= 6'h07;
 
     // palbg[8]  <= 6'h0F;
-    palbg[9]  <= 6'h27;
-    palbg[10] <= 6'h17;
-    palbg[11] <= 6'h07;
+    palbg[9]    <= 6'h27;
+    palbg[10]   <= 6'h17;
+    palbg[11]   <= 6'h07;
 
     // palbg[12] <= 6'h0F;
-    palbg[13] <= 6'h20;
-    palbg[14] <= 6'h10;
-    palbg[15] <= 6'h21;
+    palbg[13]   <= 6'h20;
+    palbg[14]   <= 6'h10;
+    palbg[15]   <= 6'h21;
 
 end
 else begin
@@ -127,7 +134,16 @@ else begin
     X <= xmax ?         0 : X + 1;
     Y <= xmax ? (ymax ? 0 : Y + 1) : Y;
 
-    // Вычисление видеовывода
+    // Процессы выполняются в замедлении до 89080Т за кадр (5.34 Mhz)
+    if ({X[0], Y[0]} == 2'b00 && X < 680 && Y < 524) begin
+
+        lock_cpu <= (cck == 1'b0);
+        cck <= (cck == 2) ? 0 : cck + 1;
+
+    end else lock_cpu <= 1'b0;
+
+    // Вычисление видеоданных для фона
+    // ----------------------------
     case (x[3:0])
     // CHAR YYYYYXXXXX
     0: begin ppu_addr <= {2'b10, tilepage, y[8:4], x[8:4]}; end

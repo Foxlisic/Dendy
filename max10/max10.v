@@ -61,7 +61,7 @@ wire [ 7:0] ppu_in =
 
 ppu PPU
 (
-    .clock      (clock_100),
+    .clock      (clock_25),
     .reset_n    (locked),
     .address    (address),
     .in         (in),
