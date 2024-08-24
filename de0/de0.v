@@ -82,8 +82,10 @@ assign HEX3 = 7'b1111111;
 assign HEX4 = 7'b1111111;
 assign HEX5 = 7'b1111111;
 
-// TEST
-assign LEDR[7:0] = out;
+// Провода
+// --------------------------------------------------------------
+wire [7:0]  x2a, x2i, x2o;
+wire        x2w;
 
 // Генератор частот
 // --------------------------------------------------------------
@@ -93,61 +95,46 @@ wire clock_25;
 
 pll PLL0
 (
-    .clkin     (CLOCK_50),
-    .m25       (clock_25),
-    .m50       (clock_50),
-    .m100      (clock_100),
-    .locked    (locked)
+    .clkin      (CLOCK_50),
+    .m25        (clock_25),
+    .m50        (clock_50),
+    .m100       (clock_100),
+    .locked     (locked)
 );
 
-// Процессор
-// -----------------------------------------------------------------------------
+// PPU Pixel Processing Unix
+// --------------------------------------------------------------
 
-wire [15:0] address;
-wire [ 7:0] out, in_ram, in_rom;
-wire        irq, we, rd;
-
-nes CPU6502
+ppu DendyPPU
 (
-    .clock      (clock_25),
+    .clock25    (clock_25),
     .reset_n    (locked),
-    .locked     (1'b1),
-    .address    (address),
-    .irq        (irq),
-    .in         (in),
-    .out        (out),
-    .we         (we),
-    .rd         (rd)
+    // -- Физический интерфейс --
+    .r          (VGA_R),
+    .g          (VGA_G),
+    .b          (VGA_B),
+    .hs         (VGA_HS),
+    .vs         (VGA_VS),
+    // -- Подключение к памяти --
+    .x2a        (x2a),
+    .x2i        (x2i),
+    .x2o        (x2o),
+    .x2w        (x2w),
 );
 
-// Модули памяти
-// -----------------------------------------------------------------------------
+// Подключение модулей памяти
+// --------------------------------------------------------------
 
-wire is_ram = (address <  16'h2000),
-     is_rom = (address >= 16'h8000);
-
-wire [ 7:0] in =
-    is_ram ? in_ram :
-    is_rom ? in_rom : 8'hFF;
-
-// 1KB RAM
-mem_ram M1
+// Для хранения сканлайна
+mem_x2 MemoryDoubleVGA
 (
-    .clock  (clock_100),
-    .a      (address[9:0]),
-    .w      (we & is_ram),
-    .d      (out),
-    .q      (in_ram)
-);
-
-// 2KB RAM
-mem_rom M2
-(
-    .clock  (clock_100),
-    .a      (address[10:0]),
-    .q      (in_rom)
+    .clock      (clock_100),
+    .a          (x2a),
+    .q          (x2i),
+    .d          (x2o),
+    .w          (x2w),
 );
 
 endmodule
 
-`include "../nes.v"
+`include "../ppu.v"

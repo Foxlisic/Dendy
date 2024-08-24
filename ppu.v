@@ -1,24 +1,35 @@
-/* verilator lint_off WIDTH */
+/* verilator lint_off WIDTHEXPAND */
+/* verilator lint_off WIDTHTRUNC */
+
+/**
+ * Формирование видеосигнала на VGA 800 x 525
+ * Однако, работают по таймингам 341 x 262
+ */
+
 module ppu
 (
-    input               clock,
+    input               clock25,
     input               reset_n,
-    input       [15:0]  address,
-    input       [ 7:0]  in,
-    input               rd,
-    input               we,
-    output  reg         lock_cpu,       // Разрешение работы CPU
-    // MEMORY
-    output  reg [13:0]  ppu_addr,
-    input       [ 7:0]  ppu_in,
-    output reg  [ 7:0]  ppu_out,
-    output reg          ppu_we,
-    // VGA OUT
-    output reg  [ 3:0]  R,
-    output reg  [ 3:0]  G,
-    output reg  [ 3:0]  B,
-    output              HS,
-    output              VS
+    // --- Интерфейс видеосигнала ---
+    output      [3:0]   r,
+    output      [3:0]   g,
+    output      [3:0]   b,
+    output              hs,
+    output              vs,
+    // --- Счетчики ---
+    output reg  [8:0]   px,         // PPU.x = 0..340
+    output reg  [8:0]   py,         // PPU.y = 0..261
+    // --- Связь с памятью ---
+    output reg  [15:0]  chra,       // Адрес в видеопамяти
+    input       [ 7:0]  chrd,       // Данные из видеопамяти
+    // --- Удвоение сканлайна ---
+    output reg  [ 7:0]  x2a,
+    input       [ 7:0]  x2i,
+    output reg  [ 7:0]  x2o,
+    output reg          x2w,
+    // --- Управление ---
+    output reg          ce_cpu,
+    output reg          ce_ppu
 );
 
 // ---------------------------------------------------------------------
@@ -26,139 +37,241 @@ module ppu
 //           Visible       Front        Sync        Back       Whole
 parameter hzv =  640, hzf =   16, hzs =   96, hzb =   48, hzw =  800,
           vtv =  480, vtf =   10, vts =    2, vtb =   33, vtw =  525;
+
+// Вычисления границ кадра или линии
 // ---------------------------------------------------------------------
-assign HS = X  < (hzb + hzv + hzf); // NEG.
-assign VS = Y  < (vtb + vtv + vtf); // NEG.
-// ---------------------------------------------------------------------
+assign  hs      = x  < (hzb + hzv + hzf); // NEG.
+assign  vs      = y  < (vtb + vtv + vtf); // NEG.
+wire    xmax    = (x == hzw - 1);
+wire    ymax    = (y == vtw - 1);
+wire    vsx     = x >= hzb && x < hzb+640;
+wire    vsy     = y >= vtb && y < vtb+480;
+wire    border  = vsx && vsy && (x < hzb + 64 || x > hzb + 64 + 512);
+wire    paper   = px >= 32 && px < (32 + 256) && py >= 16 && py < 256;
+
 // Позиция луча в кадре и максимальные позиции (x,y)
-reg  [10:0] X    = 0;
-reg  [ 9:0] Y    = 0;
-wire        xmax = (X == hzw - 1);
-wire        ymax = (Y == vtw - 1);
-wire [11:0] x    = (X - hzb) - 48;  // 48=2x24; 24=16[бордер]+8[предзагрузка]
-wire [10:0] y    = (Y - vtb);
-
 // ---------------------------------------------------------------------
-reg  [ 1:0] cck;
+reg  [ 9:0] x = 0;
+reg  [ 9:0] y = 0;
+reg  [ 1:0] ct_cpu = 0;
+reg  [14:0] v = 0, t = 0;
+reg  [ 2:0] finex = 0, _finex = 0;
+reg  [ 7:0] ctrl;
+reg  [15:0] bgtile, _bgtile;    // Сохраненное значение тайла фона
+reg  [ 1:0] bgattr;             // Номер палитры для фона (0..2)
+reg  [ 5:0] cl = 6'h00;
+reg  [ 5:0] bgpal[16];          // Палитра фона
+reg  [ 5:0] sppal[16];          // Палитра спрайтов
 // ---------------------------------------------------------------------
-wire [ 1:0] tilepage = mappage ^ x[9] ^ y[9];
-reg  [ 7:0] char, attr;
-
-// Выбранная страница
-reg         chrpage; // фона в CHR-ROM
-reg         mappage; // тайловой карты
-
-// Фоновый цвет
-reg  [ 3:0] bgcolor;
-
-// Палитры фона и спрайтов
-reg  [ 6:0] palbg[16];
-
-// Номер цветового тайла 2x2
-wire [ 2:0] asel = {y[5], x[5], 1'b0};
-
-// Вычисление цвета фона
-reg  [17:0] mask, mask_;
-
-// Выбор пикселя
-wire [ 1:0] maskbg = {mask[{1'b1, ~x[3:1]}], mask[{1'b0, ~x[3:1]}]};
-
-// Область рисования Paper
-wire        paper = (X >= hzb + 64) && (X < hzb + 64 + 512);
-
-// Любой цвет, равный 0, будет использовать палитру номер 0
-wire [ 3:0] bgin = {maskbg ? mask[17:16] : 2'b00, maskbg};
-
-// Выбор итогового цвета
-wire [ 5:0] cin  = palbg[ paper ? bgin : bgcolor ];
+wire [ 4:0] coarse_x = v[4:0],
+            coarse_y = v[9:5];
+wire [ 2:0] fine_y   = v[14:12];
 // ---------------------------------------------------------------------
 
-// Трансляцияц цвета
-wire [11:0] outcolor =
-    cin == 6'h00 ?  12'h777 : cin == 6'h01 ?  12'h218 : cin == 6'h02 ?  12'h00A : cin == 6'h03 ?  12'h409 :
-    cin == 6'h04 ?  12'h807 : cin == 6'h05 ?  12'hA01 : cin == 6'h06 ?  12'hA00 : cin == 6'h07 ?  12'h700 :
-    cin == 6'h08 ?  12'h420 : cin == 6'h09 ?  12'h040 : cin == 6'h0A ?  12'h050 : cin == 6'h0B ?  12'h031 :
-    cin == 6'h0C ?  12'h135 : cin == 6'h0D ?  12'h000 : cin == 6'h0E ?  12'h000 : cin == 6'h0F ?  12'h000 :
-    cin == 6'h10 ?  12'hBBB : cin == 6'h11 ?  12'h07E : cin == 6'h12 ?  12'h23E : cin == 6'h13 ?  12'h80F :
-    cin == 6'h14 ?  12'hB0B : cin == 6'h15 ?  12'hE05 : cin == 6'h16 ?  12'hD20 : cin == 6'h17 ?  12'hC40 :
-    cin == 6'h18 ?  12'h870 : cin == 6'h19 ?  12'h090 : cin == 6'h1A ?  12'h0A0 : cin == 6'h1B ?  12'h093 :
-    cin == 6'h1C ?  12'h088 : cin == 6'h1D ?  12'h000 : cin == 6'h1E ?  12'h000 : cin == 6'h1F ?  12'h000 :
-    cin == 6'h20 ?  12'hFFF : cin == 6'h21 ?  12'h3BF : cin == 6'h22 ?  12'h59F : cin == 6'h23 ?  12'hA8F :
-    cin == 6'h24 ?  12'hF7F : cin == 6'h25 ?  12'hF7B : cin == 6'h26 ?  12'hF76 : cin == 6'h27 ?  12'hF93 :
-    cin == 6'h28 ?  12'hFB3 : cin == 6'h29 ?  12'h8D1 : cin == 6'h2A ?  12'h4D4 : cin == 6'h2B ?  12'h5F9 :
-    cin == 6'h2C ?  12'h0ED : cin == 6'h2D ?  12'h000 : cin == 6'h2E ?  12'h000 : cin == 6'h2F ?  12'h000 :
-    cin == 6'h30 ?  12'hFFF : cin == 6'h31 ?  12'hAEF : cin == 6'h32 ?  12'hCDF : cin == 6'h33 ?  12'hDCF :
-    cin == 6'h34 ?  12'hFCF : cin == 6'h35 ?  12'hFCD : cin == 6'h36 ?  12'hFBB : cin == 6'h37 ?  12'hFDA :
-    cin == 6'h38 ?  12'hFEA : cin == 6'h39 ?  12'hEFA : cin == 6'h3A ?  12'hAFB : cin == 6'h3B ?  12'hBFC :
-    cin == 6'h3C ?  12'h9FF : cin == 6'h3D ?  12'h000 : cin == 6'h3E ?  12'h000 :                 12'h000;
+assign {r, g, b} =
 
-always @(negedge clock)
-if (reset_n == 1'b0) begin
+    cl == 6'h00 ? 12'h777 : cl == 6'h01 ? 12'h218 : cl == 6'h02 ? 12'h00A : cl == 6'h03 ? 12'h409 :
+    cl == 6'h04 ? 12'h807 : cl == 6'h05 ? 12'hA01 : cl == 6'h06 ? 12'hA00 : cl == 6'h07 ? 12'h700 :
+    cl == 6'h08 ? 12'h420 : cl == 6'h09 ? 12'h040 : cl == 6'h0A ? 12'h050 : cl == 6'h0B ? 12'h031 :
+    cl == 6'h0C ? 12'h135 : cl == 6'h0D ? 12'h000 : cl == 6'h0E ? 12'h000 : cl == 6'h0F ? 12'h000 :
+    // --
+    cl == 6'h10 ? 12'hBBB : cl == 6'h11 ? 12'h07E : cl == 6'h12 ? 12'h23E : cl == 6'h13 ? 12'h80F :
+    cl == 6'h14 ? 12'hB0B : cl == 6'h15 ? 12'hE05 : cl == 6'h16 ? 12'hD20 : cl == 6'h17 ? 12'hC40 :
+    cl == 6'h18 ? 12'h870 : cl == 6'h19 ? 12'h090 : cl == 6'h1A ? 12'h0A0 : cl == 6'h1B ? 12'h093 :
+    cl == 6'h1C ? 12'h088 : cl == 6'h1D ? 12'h000 : cl == 6'h1E ? 12'h000 : cl == 6'h1F ? 12'h000 :
+    // --
+    cl == 6'h20 ? 12'hFFF : cl == 6'h21 ? 12'h3BF : cl == 6'h22 ? 12'h59F : cl == 6'h22 ? 12'hA8F :
+    cl == 6'h24 ? 12'hF7F : cl == 6'h25 ? 12'hF7B : cl == 6'h26 ? 12'hF76 : cl == 6'h26 ? 12'hF93 :
+    cl == 6'h28 ? 12'hFB3 : cl == 6'h29 ? 12'h8D1 : cl == 6'h2A ? 12'h4D4 : cl == 6'h2A ? 12'h5F9 :
+    cl == 6'h2C ? 12'h0ED : cl == 6'h2D ? 12'h000 : cl == 6'h2E ? 12'h000 : cl == 6'h2E ? 12'h000 :
+    // --
+    cl == 6'h30 ? 12'hFFF : cl == 6'h31 ? 12'hAEF : cl == 6'h32 ? 12'hCDF : cl == 6'h33 ? 12'hDCF :
+    cl == 6'h34 ? 12'hFCF : cl == 6'h35 ? 12'hFCD : cl == 6'h36 ? 12'hFBB : cl == 6'h37 ? 12'hFDA :
+    cl == 6'h38 ? 12'hFEA : cl == 6'h39 ? 12'hEFA : cl == 6'h3A ? 12'hAFB : cl == 6'h3B ? 12'hBFC :
+    cl == 6'h3C ? 12'h9FF :                                                               12'h000;
 
-    cck         <= 1'b0;
-    ppu_we      <= 1'b0;
-    chrpage     <= 1'b1;
-    mappage     <= 1'b0;
-    lock_cpu    <= 1'b0;
+// Вычисление конечного цвета
+// ---------------------------------------------------------------------
 
-    X <= 0;
-    Y <= 0;
+// Трансляция текущего пикселя в итоговый цвет на основе считанного цветового домена
+wire [3:0] src_bg = {bgattr[1:0], bgtile[{1'b1, ~finex}], bgtile[{1'b0, ~finex}]};
+wire [5:0] dst_bg = bgpal[ src_bg ];
+wire [5:0] dst    = dst_bg;
 
-    palbg[0]    <= 6'h0F;
-    palbg[1]    <= 6'h20;
-    palbg[2]    <= 6'h10;
-    palbg[3]    <= 6'h00;
+always @(posedge clock25)
+if (reset_n == 1'b0)
+begin
 
-    // palbg[4]  <= 6'h0F;
-    palbg[5]    <= 6'h1A;
-    palbg[6]    <= 6'h27;
-    palbg[7]    <= 6'h07;
+    x       <= 0;
+    y       <= 0;       // 0|1
+    v       <= 0;
+    t       <= 0;
+    px      <= 0;
+    py      <= 0;       // 0|16
+    finex   <= 0;
+    ce_cpu  <= 0;
+    ce_ppu  <= 0;
+    ct_cpu  <= 0;
 
-    // palbg[8]  <= 6'h0F;
-    palbg[9]    <= 6'h27;
-    palbg[10]   <= 6'h17;
-    palbg[11]   <= 6'h07;
+    //               4
+    ctrl    <= 8'b0001_0000;
 
-    // palbg[12] <= 6'h0F;
-    palbg[13]   <= 6'h20;
-    palbg[14]   <= 6'h10;
-    palbg[15]   <= 6'h21;
+    // Палитра фона
+    bgpal[ 0] <= 6'h0F; bgpal[ 1] <= 6'h16; bgpal[ 2] <= 6'h30; bgpal[ 3] <= 6'h38;
+    bgpal[ 4] <= 6'h00; bgpal[ 5] <= 6'h0A; bgpal[ 6] <= 6'h04; bgpal[ 7] <= 6'h05;
+    bgpal[ 8] <= 6'h00; bgpal[ 9] <= 6'h0B; bgpal[10] <= 6'h06; bgpal[11] <= 6'h07;
+    bgpal[12] <= 6'h00; bgpal[13] <= 6'h0C; bgpal[14] <= 6'h08; bgpal[15] <= 6'h09;
+
+    // Палитра фона
+    sppal[ 0] <= 6'h00; sppal[ 1] <= 6'h01; sppal[ 2] <= 6'h02; sppal[ 3] <= 6'h03;
+    sppal[ 4] <= 6'h00; sppal[ 5] <= 6'h01; sppal[ 6] <= 6'h02; sppal[ 7] <= 6'h03;
+    sppal[ 8] <= 6'h00; sppal[ 9] <= 6'h01; sppal[10] <= 6'h02; sppal[11] <= 6'h03;
+    sppal[12] <= 6'h00; sppal[13] <= 6'h01; sppal[14] <= 6'h02; sppal[15] <= 6'h03;
 
 end
-else begin
+else
+begin
 
-    // Черный цвет за пределами видимой области рисования
-    {R, G, B} <= 12'h000;
+    // Разрешение такта для CPU
+    ce_cpu <= 0;
+    ce_ppu <= 0;
+    x2w    <= 0;
 
     // Кадровая развертка
-    X <= xmax ?         0 : X + 1;
-    Y <= xmax ? (ymax ? 0 : Y + 1) : Y;
+    x <= xmax ?         0 : x + 1;
+    y <= xmax ? (ymax ? 0 : y + 1) : y;
 
-    // Процессы выполняются в замедлении до 89080Т за кадр (5.34 Mhz)
-    if ({X[0], Y[0]} == 2'b00 && X < 680 && Y < 524) begin
+    // -----------------------------------------------------
 
-        lock_cpu <= (cck == 1'b0);
-        cck <= (cck == 2) ? 0 : cck + 1;
+    // Области гашения луча :: черный цвет
+    if (!vsy || !vsx) begin cl <= 6'h3F; end
+    // Фоновый цвет
+    else if (border) cl <= 6'h00;
 
-    end else lock_cpu <= 1'b0;
+    // -----------------------------------------------------
 
-    // Вычисление видеоданных для фона
-    // ----------------------------
-    case (x[3:0])
-    // CHAR YYYYYXXXXX
-    0: begin ppu_addr <= {2'b10, tilepage, y[8:4], x[8:4]}; end
-    // ATTR 1111YYYXXX
-    1: begin ppu_addr <= {2'b10, tilepage, 4'b1111, y[8:6], x[8:6]}; char <= ppu_in; end
-    // CHR-ROM Читать BG
-    2: begin ppu_addr <= {chrpage, char, 1'b0, y[3:1]}; mask_[17:16] <= {ppu_in[asel | 1'b1], ppu_in[asel]}; end
-    3: begin mask_[ 7:0] <= ppu_in; ppu_addr[3] <= 1'b1; end
-    4: begin mask_[15:8] <= ppu_in; end
-    // OUTPUT COLOR
-    15: begin mask <= mask_; end
-    endcase
+    // На 524-й строке обнулить счетчики PX,PY
+    if      (ymax) begin px <= 0; py <= 0; end
+    else if (xmax) begin px <= 0; end
+    // 1x1 PPU = 2x2 VGA [HZB ... +2*341)
+    // Процессинг PPU, чересстрочный для VGA
+    else if (x >= hzb && x < hzb + 341*2) begin
 
-    // Вывод окна видеоадаптера
-    if (X >= hzb && X < hzb + hzv && Y >= vtb && Y < vtb + vtv) {R, G, B} <= outcolor;
+        // Нечетный сканлайн [01]
+        if (x[0] & y[0])
+        begin
+
+            // 3Т PPU = 1T CPU
+            ct_cpu <= (ct_cpu == 2) ? 0 : ct_cpu + 1;
+            ce_cpu <= (ct_cpu == 0);
+            ce_ppu <= 1;
+
+            // Счетчики работают только в пределах видимой области
+            // 8 пиксельный пре-рендер данных
+            if (px >= 32-8 && px < 32+256)
+            begin
+
+                // При любом кратном 8x вернется на исходную позицию
+                finex <= finex + 1;
+
+                case (finex)
+                // Запрос символа [2Bit Nametable, 5Bit Coarse Y, 5Bit Coarse X]
+                3: begin chra <= {4'h2, /*NT*/ v[11:10], coarse_y, coarse_x}; end
+                // Чтение символа и запрос знакогенератора [NT 1 + CHR 8 + 1CLR + FineY 3]
+                4: begin chra <= {ctrl[4], chrd[7:0], 1'b0, fine_y}; end
+                // Чтение знакогенератора [2 байта]
+                5: begin _bgtile[ 7:0] <= chrd; chra[3] <= 1'b1; end
+                // Запрос атрибутов
+                6: begin
+
+                    chra <= {4'h2, /*NT*/ v[11:10], /* X=0, Y=30 */ 4'b1111, coarse_y[4:2], coarse_x[4:2]};
+                    _bgtile[15:8] <= chrd;
+
+                end
+
+                // Чтение атрибута, инкременты
+                7: begin
+
+                    // Данные на выход
+                    bgattr[0] <= chrd[{v[6],v[1],1'b0}];
+                    bgattr[1] <= chrd[{v[6],v[1],1'b1}];
+                    bgtile    <= _bgtile;
+
+                    // При достижении X=31, X=0
+                    if (v[4:0] == 31)
+                    begin
+
+                        // X=0 :: Смена NT[Horiz]
+                        v[4:0]  <= 0;
+                        v[10]   <= ~v[10];
+
+                    end
+                    // Иначе инкрементируется на следующий CX
+                    else v[4:0] <= v[4:0] + 1;
+
+
+                end
+                endcase
+
+            end
+
+            // Переход к следующей линии
+            if (px == 32+256+4)
+            begin
+
+                // Вернуть горизонтальным счетчикам значение из `t` для рисования новой строки [horiz]
+                {v[10], v[4:0]} <= {t[10], t[4:0]};
+
+                // FineY++
+                v[14:12] <= fine_y + 1;
+
+                // Инкремент CoarseY
+                if (fine_y == 7)
+                begin
+
+                    // Fine Y=0
+                    v[14:12] <= 0;
+
+                    // Смена NT[Vertical]
+                    if      (v[9:5] == 29) begin v[9:5] <= 0; v[11] <= ~v[11]; end
+                    // Сброс Y на 31-й строке
+                    else if (v[9:5] == 31) begin v[9:5] <= 0; end
+                    // CoarseY++
+                    else                   begin v[9:5] <= v[9:5] + 1; end
+
+                end
+
+            end
+
+            // Кадр начинается с позиции PY=15, так как 33 пикселя сверху идут для VGA как VBlank
+            // Вернуть вертикальным счетчикам  значение из `t` для рисования нового кадра [vert]
+            if (px == 32+256+8 && py == 15) begin {v[14:12], v[11], v[9:5]} <= {t[14:12], t[11], t[9:5]}; end
+
+            // Счетчик PX, PY
+            px <= (px == 340) ? 0 : px + 1;
+            py <= (px == 340) ? py + 1 : py;
+
+            // Видимая область [pX=32..287, PY=16..255]
+            if (paper) begin
+
+                cl  <= dst;
+                x2o <= dst;
+                x2a <= px - 32;
+                x2w <= 1;
+
+            end
+
+        end
+        // Четный сканлайн: читать ранее записанное (удвоение)
+        else if (y[0] == 1'b0 && !border && py > 16 && py <= 256)
+        begin
+
+            if (x[0]) cl  <= x2i;
+            else      x2a <= ((x - hzb) >> 1) - 32;
+
+        end
+
+    end
 
 end
 

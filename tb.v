@@ -1,78 +1,60 @@
 `timescale 10ns / 1ns
-
 module tb;
 // ---------------------------------------------------------------------
-reg reset_n;
-reg clock;     always #0.5 clock    = ~clock;
-reg clock_25;  always #1.0 clock_25 = ~clock_25;
+reg         clock, clock25, reset_n;
+always #0.5 clock       = ~clock;
+always #2.0 clock25     = ~clock25;
 // ---------------------------------------------------------------------
-initial begin
-
-          reset_n = 0; irq = 0; clock = 0; clock_25 = 0;
-    #2.5  reset_n = 1;
-    #7.5  irq = 1;
-    #15.0 irq = 0;
-    #5000 $finish;
-
-end
+initial begin reset_n = 0; clock = 0; clock25 = 0; #3.0 reset_n = 1; #12000 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
-initial begin $readmemh("tb.hex", memory, 0); end
+// ---------------------------------------------------------------------
+reg  [ 7:0] ram[65536];
+reg  [ 7:0] vmm[65536];
+wire [15:0] chra, address;
+reg  [ 7:0] chrd, in;
+wire [ 7:0] out;
+wire        we;
+// ---------------------------------------------------------------------
+wire        ce_cpu;
+// ---------------------------------------------------------------------
 initial begin
-    memory[16'hFFFA] = 8'h04; memory[16'hFFFB] = 8'h00;  // NMI
-    memory[16'hFFFC] = 8'h00; memory[16'hFFFD] = 8'h00;  // RESET
-    memory[16'hFFFE] = 8'h01; memory[16'hFFFF] = 8'h00;  // BRK
+
+    $readmemh("tb.hex", ram, 16'h0000);
+    $readmemh("ch.hex", vmm, 16'h0000);
+    $readmemh("vm.hex", vmm, 16'h2000);
+
 end
 // ---------------------------------------------------------------------
-reg  [ 7:0] memory[65536]; // Чистая теория
-wire [15:0] address;
-wire [ 7:0] out;
-reg  [ 7:0] in;
-wire        we, rd;
-reg         irq;
+always @(posedge clock)
+begin
 
-// Здесь посложнее будет позже
-always @(posedge clock) begin in <= memory[address]; if (we) memory[address] <= out; end
+    in   <= ram[address];
+    chrd <= vmm[chra];
+    if (we) ram[address] <= out;
+
+end
+
+// Центральный процессор
 // ---------------------------------------------------------------------
-
-wire        lock_cpu;
-wire [13:0] ppu_addr;
-wire [ 7:0] ppu_out, ppu_in;
-wire [ 3:0] vga_r, vga_g, vga_b;
-wire        ppu_we, vga_hs, vga_vs;
-
-nes CPU6502
+cpu DendyCPU
 (
-    .clock      (clock_25),
-    .locked     (lock_cpu),
+    .clock      (clock25),
     .reset_n    (reset_n),
-    .address    (address),
-    .irq        (irq),
-    .in         (in),
-    .out        (out),
-    .we         (we),
-    .rd         (rd)
+    .A          (address),
+    .I          (in),
+    .D          (out),
+    .W          (we)
 );
 
-ppu PPU
+// Видеопроцессор
+// ---------------------------------------------------------------------
+ppu DendyPPU
 (
-    .clock      (clock_25),
+    .clock25    (clock25),
     .reset_n    (reset_n),
-    .address    (address),
-    .in         (in),
-    .rd         (rd),
-    .we         (we),
-    .lock_cpu   (lock_cpu),
-    // MEMORY
-    .ppu_addr   (ppu_addr),
-    .ppu_in     (ppu_in),
-    .ppu_out    (ppu_out),
-    .ppu_we     (ppu_we),
-    // VGA OUT
-    .R          (vga_r),
-    .G          (vga_g),
-    .B          (vga_b),
-    .HS         (vga_hs),
-    .VS         (vga_vs)
+    .ce_cpu     (ce_cpu),
+    .chra       (chra),
+    .chrd       (chrd)
 );
 
 endmodule
