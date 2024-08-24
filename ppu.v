@@ -95,7 +95,7 @@ assign {r, g, b} =
 
 // Трансляция текущего пикселя в итоговый цвет на основе считанного цветового домена
 wire [3:0] src_bg = {bgattr[1:0], bgtile[{1'b1, ~finex}], bgtile[{1'b0, ~finex}]};
-wire [5:0] dst_bg = bgpal[ src_bg ];
+wire [5:0] dst_bg = bgpal[ src_bg[1:0] ? src_bg : 0 ];
 wire [5:0] dst    = dst_bg;
 
 always @(posedge clock25)
@@ -118,9 +118,9 @@ begin
 
     // Палитра фона
     bgpal[ 0] <= 6'h0F; bgpal[ 1] <= 6'h16; bgpal[ 2] <= 6'h30; bgpal[ 3] <= 6'h38;
-    bgpal[ 4] <= 6'h00; bgpal[ 5] <= 6'h0A; bgpal[ 6] <= 6'h04; bgpal[ 7] <= 6'h05;
-    bgpal[ 8] <= 6'h00; bgpal[ 9] <= 6'h0B; bgpal[10] <= 6'h06; bgpal[11] <= 6'h07;
-    bgpal[12] <= 6'h00; bgpal[13] <= 6'h0C; bgpal[14] <= 6'h08; bgpal[15] <= 6'h09;
+    bgpal[ 4] <= 6'h00; bgpal[ 5] <= 6'h16; bgpal[ 6] <= 6'h26; bgpal[ 7] <= 6'h07;
+    bgpal[ 8] <= 6'h00; bgpal[ 9] <= 6'h26; bgpal[10] <= 6'h00; bgpal[11] <= 6'h30;
+    bgpal[12] <= 6'h00; bgpal[13] <= 6'h38; bgpal[14] <= 6'h28; bgpal[15] <= 6'h10;
 
     // Палитра фона
     sppal[ 0] <= 6'h00; sppal[ 1] <= 6'h01; sppal[ 2] <= 6'h02; sppal[ 3] <= 6'h03;
@@ -146,7 +146,7 @@ begin
     // Области гашения луча :: черный цвет
     if (!vsy || !vsx) begin cl <= 6'h3F; end
     // Фоновый цвет
-    else if (border) cl <= 6'h00;
+    else if (border) cl <= bgpal[0];
 
     // -----------------------------------------------------
 

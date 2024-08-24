@@ -31,6 +31,7 @@ public:
 
     TB(int argc, char** argv)
     {
+        FILE* fp;
         uint8_t ines[16];
 
         x   = 0;
@@ -70,7 +71,7 @@ public:
 
         if (argc > 1) {
 
-            FILE* fp = fopen(argv[1], "rb");
+            fp = fopen(argv[1], "rb");
             if (fp) {
 
                 fread(ines, 1, 16, fp);
@@ -98,10 +99,17 @@ public:
             }
         }
 
-        for (int i = 0; i < 16; i++)
-        for (int j = 0; j < 16; j++) {
-            videom[0x2000 + i*32 + j] = j + i*16;
+        if (argc > 2) {
+
+            if (fp = fopen(argv[2], "rb")) {
+
+                fread(videom, 1, 16384, fp);
+                fclose(fp);
+            }
+
         }
+
+        // for (int i = 0; i < 16; i++) for (int j = 0; j < 16; j++) videom[0x2000 + i*32 + j] = i*16 + j;
     }
 
     // Основной цикл работы
