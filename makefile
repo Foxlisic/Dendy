@@ -16,7 +16,7 @@ app: syn
 		$(VLIB)/verilated.cpp \
 		obj_dir/Vppu__ALL.a \
 		-lSDL2
-	./tb roms/01_lode.nes roms/01_lode_vram.bin > tb.log
+	./tb roms/01_lode.nes roms/01_video.bin > tb.log
 syn:
 	verilator -cc ppu.v > /dev/null
 	cd obj_dir && make -f Vppu.mk > /dev/null

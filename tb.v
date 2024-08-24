@@ -10,9 +10,10 @@ initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 // ---------------------------------------------------------------------
 reg  [ 7:0] ram[65536];
 reg  [ 7:0] vmm[65536];
+reg  [ 7:0] oam[256];
 wire [15:0] chra, address;
-reg  [ 7:0] chrd, in;
-wire [ 7:0] out;
+reg  [ 7:0] chrd, in, oamd;
+wire [ 7:0] out, oama;
 wire        we;
 // ---------------------------------------------------------------------
 wire        ce_cpu;
@@ -22,6 +23,7 @@ initial begin
     $readmemh("tb.hex", ram, 16'h0000);
     $readmemh("ch.hex", vmm, 16'h0000);
     $readmemh("vm.hex", vmm, 16'h2000);
+    $readmemh("sp.hex", oam,  8'h00);
 
 end
 // ---------------------------------------------------------------------
@@ -30,6 +32,8 @@ begin
 
     in   <= ram[address];
     chrd <= vmm[chra];
+    oamd <= oam[oama];
+
     if (we) ram[address] <= out;
 
 end
@@ -54,7 +58,9 @@ ppu DendyPPU
     .reset_n    (reset_n),
     .ce_cpu     (ce_cpu),
     .chra       (chra),
-    .chrd       (chrd)
+    .chrd       (chrd),
+    .oama       (oama),
+    .oamd       (oamd)
 );
 
 endmodule

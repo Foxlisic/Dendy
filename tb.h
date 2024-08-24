@@ -19,6 +19,7 @@ protected:
     uint8_t*    videom;
     uint8_t*    chrrom;
     uint8_t*    program;
+    uint8_t     oam[256];
     uint8_t     x2line[256];
 
     int         cnt_prg_rom;
@@ -69,6 +70,7 @@ public:
         ppu->clock25 = 1; ppu->eval();
         ppu->reset_n = 1;
 
+        // Загрузка NES-файла
         if (argc > 1) {
 
             fp = fopen(argv[1], "rb");
@@ -99,17 +101,24 @@ public:
             }
         }
 
+        // Загрузка CHR-ROM + VideoMemory
         if (argc > 2) {
 
             if (fp = fopen(argv[2], "rb")) {
-
                 fread(videom, 1, 16384, fp);
                 fclose(fp);
             }
 
         }
 
-        // for (int i = 0; i < 16; i++) for (int j = 0; j < 16; j++) videom[0x2000 + i*32 + j] = i*16 + j;
+        // Загрузка OAM
+        if (argc > 3) {
+
+            if (fp = fopen(argv[3], "rb")) {
+                fread(oam, 1, 256, fp);
+                fclose(fp);
+            }
+        }
     }
 
     // Основной цикл работы
@@ -183,6 +192,10 @@ public:
 
         // Чтение из видеопамяти
         ppu->chrd = (PA < 0x2000) ? chrrom[PA] : videom[PA];
+
+        // Чтение OAM
+        ppu->oamd = oam[ppu->oama];
+
 
         // --- Исполнение тактов ---
         ppu->clock25 = 0; ppu->eval();
