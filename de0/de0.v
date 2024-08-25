@@ -84,13 +84,13 @@ assign HEX5 = 7'b1111111;
 
 // Провода
 // --------------------------------------------------------------
-wire [7:0]  x2a, x2i, x2o, chrd, oama, oamd;
-wire [7:0]  chr_i, vram_i;
+wire [7:0]  x2a, x2i, x2o, oama, oamd;
+wire [7:0]  chr_i, vrm_i;
 wire        x2w;
 
-// Чтение [CHR или VRAM]
+// Чтение [CHR или vrm]
 wire [13:0] chra;
-wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vram_i : 8'hFF);
+wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vrm_i : 8'hFF);
 
 // Генератор частот
 // --------------------------------------------------------------
@@ -153,15 +153,15 @@ mem_chr DendyCHRROM
 );
 
 // 2K для знакогенератора
-mem_vram DendyVideoRAM
+mem_vrm DendyVideoRAM
 (
     .clock      (clock_100),
     .a          (chra[10:0]),
-    .q          (vram_i),
+    .q          (vrm_i),
 );
 
 // 1K для символов спрайтов
-mem_oam DendyVideoRAM
+mem_oam DendyOAM
 (
     .clock      (clock_100),
     .a          (oama),

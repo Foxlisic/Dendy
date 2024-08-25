@@ -11,7 +11,8 @@ initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 reg  [ 7:0] ram[65536];
 reg  [ 7:0] vmm[65536];
 reg  [ 7:0] oam[256];
-wire [15:0] chra, address;
+wire [15:0] address;
+wire [13:0] chra;
 reg  [ 7:0] chrd, in, oamd;
 wire [ 7:0] out, oama;
 wire        we;

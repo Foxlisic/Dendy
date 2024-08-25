@@ -28,3 +28,6 @@ obj_dir
 *.elf
 *.lst
 *.qdf
+/mem_chr.mif
+/mem_oam.mif
+/mem_vrm.mif
