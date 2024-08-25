@@ -84,8 +84,13 @@ assign HEX5 = 7'b1111111;
 
 // Провода
 // --------------------------------------------------------------
-wire [7:0]  x2a, x2i, x2o;
+wire [7:0]  x2a, x2i, x2o, chrd, oama, oamd;
+wire [7:0]  chr_i, vram_i;
 wire        x2w;
+
+// Чтение [CHR или VRAM]
+wire [13:0] chra;
+wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vram_i : 8'hFF);
 
 // Генератор частот
 // --------------------------------------------------------------
@@ -120,6 +125,10 @@ ppu DendyPPU
     .x2i        (x2i),
     .x2o        (x2o),
     .x2w        (x2w),
+    .oama       (oama),
+    .oamd       (oamd),
+    .chra       (chra),
+    .chrd       (chrd),
 );
 
 // Подключение модулей памяти
@@ -133,6 +142,30 @@ mem_x2 MemoryDoubleVGA
     .q          (x2i),
     .d          (x2o),
     .w          (x2w),
+);
+
+// 8K для знакогенератора
+mem_chr DendyCHRROM
+(
+    .clock      (clock_100),
+    .a          (chra[12:0]),
+    .q          (chr_i),
+);
+
+// 2K для знакогенератора
+mem_vram DendyVideoRAM
+(
+    .clock      (clock_100),
+    .a          (chra[10:0]),
+    .q          (vram_i),
+);
+
+// 1K для символов спрайтов
+mem_oam DendyVideoRAM
+(
+    .clock      (clock_100),
+    .a          (oama),
+    .q          (oamd),
 );
 
 endmodule

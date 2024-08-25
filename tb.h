@@ -46,7 +46,7 @@ public:
         chrrom  = (uint8_t*) malloc(128*1024);
         videom  = (uint8_t*) malloc(64*1024);
 
-        scale        = 2;           // Удвоение пикселей
+        scale        = 1;           // Удвоение пикселей
         width        = 640;         // Ширина экрана
         height       = 480;         // Высота экрана
         frame_length = (1000/20);   // 20 FPS
@@ -190,12 +190,17 @@ public:
 
         uint16_t PA = ppu->chra;
 
-        // Чтение из видеопамяти
-        ppu->chrd = (PA < 0x2000) ? chrrom[PA] : videom[PA];
+        // Чтение из CHR-ROM
+        if (PA < 0x2000) {
+            ppu->chrd = chrrom[PA];
+        }
+        // Зеркалирование VRAM [2 страницы]
+        else if (PA < 0x3F00) {
+            ppu->chrd = videom[(PA & 0x07FF) | 0x2000];
+        }
 
         // Чтение OAM
         ppu->oamd = oam[ppu->oama];
-
 
         // --- Исполнение тактов ---
         ppu->clock25 = 0; ppu->eval();

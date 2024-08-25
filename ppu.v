@@ -26,7 +26,7 @@ module ppu
     output reg  [8:0]   px,         // PPU.x = 0..340
     output reg  [8:0]   py,         // PPU.y = 0..261
     // --- Видеопамять ---
-    output reg  [15:0]  chra,       // Адрес в видеопамяти
+    output reg  [13:0]  chra,       // Адрес в видеопамяти
     input       [ 7:0]  chrd,       // Данные из видеопамяти
     // --- OAM ---
     output reg  [ 7:0]  oama,
@@ -106,7 +106,7 @@ reg         sp_invx;            // Инверсия по X спрайта
 wire [ 4:0] coarse_x    = v[4:0],
             coarse_y    = v[9:5];
 wire [ 2:0] fine_y      = v[14:12];
-wire [ 7:0] rx          = px - 32,
+wire [ 7:0] rx          = px - (32 - 1),        // -1 Из-за защелки REG на X
             ry          = py - (16 + 1);        // +1 Из-за пропуска линии
 wire [ 3:0] sp_height   = (ctrl0[5] ? 16 : 8);
 wire [ 7:0] sp_chrd     = sp_invx ? {chrd[0],chrd[1],chrd[2],chrd[3],chrd[4],chrd[5],chrd[6],chrd[7]} : chrd;
@@ -336,9 +336,9 @@ begin
             // То этот спрайт является ZeroHit на линии, потому что он виден
             5: begin
 
-                oam_id   <= oam_id + 1;
                 oam_st   <= oam_id == 7 ? 8 : 1;
                 oam_hit  <= oam_id == 0 && sp[0][15:0];
+                oam_id   <= oam_id + 1;
 
                 sp[oam_id][ 15:8] <= sp_chrd; // BGTop
 
