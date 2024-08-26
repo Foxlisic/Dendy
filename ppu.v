@@ -31,6 +31,11 @@ module ppu
     // --- OAM ---
     output reg  [ 7:0]  oama,
     input       [ 7:0]  oamd,
+    // --- PRG-ROM ---
+    output      [15:0]  prga,       // Адрес памяти RAM, PRG
+    input       [ 7:0]  prgi,       // Чтение из памяти
+    output      [ 7:0]  prgd,       // Запись в память
+    output              prgw,       // Сигнал записи
     // --- Удвоение сканлайна ---
     output reg  [ 7:0]  x2a,
     input       [ 7:0]  x2i,
@@ -40,6 +45,11 @@ module ppu
     output reg          ce_cpu,
     output reg          ce_ppu
 );
+
+assign prga  = cpu_a;
+assign prgw  = cpu_w;
+assign prgd  = cpu_o;
+assign cpu_i = prgi;
 
 assign {r, g, b} =
 
@@ -179,9 +189,9 @@ if (reset_n == 1'b0)
 begin
 
     x           <= 0;
-    y           <= 0;       // 0|1
+    y           <= 1;       // 0|1
     px          <= 0;
-    py          <= 0;       // 0|16
+    py          <= 16;       // 0|16
     finex       <= 0;
     ce_cpu      <= 0;
     ce_ppu      <= 0;

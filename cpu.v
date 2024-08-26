@@ -22,25 +22,30 @@ assign A = m ? cp : pc;
 // ---------------------------------------------------------------------
 localparam
 
-    LOAD = 0,  NDX  = 1,  NDY  = 2,  ABX  = 3,
-    ABY  = 4,  ABS  = 5,  REL  = 6,  RUN  = 7,
-    ZP   = 8,  ZPX  = 9,  ZPY  = 10, NDX2 = 11,
-    NDX3 = 12, LAT  = 13, NDY2 = 14, NDY3 = 15,
-    ABS2 = 16, ABXY = 17, REL1 = 18, REL2 = 19;
+    LOAD = 5'h00,  NDX = 5'h01,  NDY = 5'h02,  ABX = 5'h03,
+    ABY  = 5'h04,  ABS = 5'h05,  REL = 5'h06,  RUN = 5'h07,
+    ZP   = 5'h08,  ZPX = 5'h09,  ZPY = 5'h0A, NDX2 = 5'h0B,
+    NDX3 = 5'h0C,  LAT = 5'h0D, NDY2 = 5'h0E, NDY3 = 5'h0F,
+    ABS2 = 5'h10, ABXY = 5'h11, REL1 = 5'h12, REL2 = 5'h13;
 
 // Позиции флагов
 localparam CF = 0, ZF = 1, IF = 2, DF = 3, BF = 4, VF = 6, SF = 7;
+localparam
+
+    DST_A = 2'b00, DST_X = 2'b01, DST_Y = 2'b10, DST_S = 2'b11,
+    SRC_D = 2'b00, SRC_X = 2'b01, SRC_Y = 2'b10, SRC_A = 2'b11;
 
 // Список всех регистров
 // ---------------------------------------------------------------------
-reg [7:0]   a, x, y, s, p;
+reg [ 7:0]  a, x, y, s, p;
 reg [15:0]  pc;
 
 // Состояние процессора
 // ---------------------------------------------------------------------
 reg         m;              // Выбор памяти =0 PC; =1 CP
 reg         rd;             // =1 То читать из памяти =0 Писать
-reg [ 5:0]  t;              // T-State
+reg [ 4:0]  t;              // T-State
+reg [ 2:0]  n;              // N-State
 reg [15:0]  cp;             // Указатель памяти
 reg [ 7:0]  opcode;         // Сохранение опкода
 reg [ 7:0]  tr;             // Временный регистр
@@ -49,8 +54,8 @@ reg         cnext;          // =1 Разная задержка из-за инс
 
 // Вычисления
 // ---------------------------------------------------------------------
-wire [8:0]  Xi      = x + I;
-wire [8:0]  Yi      = y + I;
+wire [ 8:0] Xi      = x + I;
+wire [ 8:0] Yi      = y + I;
 wire [15:0] pcn     = pc + 1;
 wire [15:0] pcr     = pcn + {{8{I}}, I};
 wire [15:0] cpn     = cp + 1;
@@ -61,12 +66,16 @@ wire [15:0] cpc     = itr + {cout, 8'h00};
 wire [ 3:0] branch  = {p[ZF], p[CF], p[VF], p[SF]};
 
 // Либо +1T, либо к RUN
-wire [ 5:0] NEXT    = (cout || cnext) ? LAT : RUN;
+wire [ 4:0] NEXT    = (cout || cnext) ? LAT : RUN;
 
 // АЛУ
 // ---------------------------------------------------------------------
-reg [ 3:0]  alu;
-reg [ 7:0]  dst, src;
+reg  [ 3:0] alu;
+reg  [ 1:0] dst_r, src_r;
+
+// Левый [dst] и правый [src] операнд
+wire [ 7:0] dst = dst_r == DST_A ? a : dst_r == DST_X ? x : dst_r == DST_Y ? y : s;
+wire [ 7:0] src = dst_r == SRC_D ? I : src_r == SRC_X ? x : src_r == SRC_Y ? y : a;
 
 // Результат исполнения */
 wire  [8:0] ar =
@@ -121,9 +130,9 @@ if (reset_n == 1'b0) begin
 
     t   <= 0;
     m   <= 0;
-    a   <= 8'h00;
-    x   <= 8'h00;
-    y   <= 8'h00;
+    a   <= 8'h15;
+    x   <= 8'h03;
+    y   <= 8'h02;
     s   <= 8'h00;
     p   <= 8'h00;
     pc  <= 16'h0000;
@@ -142,8 +151,13 @@ else if (ce) begin
 
         pc      <= pcn;
         opcode  <= I;
+        cout    <= 0;
         cnext   <= 0;       // =1 Некоторые инструкции удлиняют такт +1
-        rd      <= 0;       // =1 Используется для запроса чтения из PPU
+        rd      <= 1;       // =1 Используется для запроса чтения из PPU
+        n       <= 0;       // ID микрокода RUN
+        alu     <= I[4:2];  // АЛУ по умолчанию
+        dst_r   <= DST_A;   // A
+        src_r   <= SRC_D;   // DataIn
 
         casex (I)
         8'bxxx_000_x1: begin t <= NDX; end  // Indirect,X
@@ -163,7 +177,10 @@ else if (ce) begin
         default:       begin t <= RUN; end
         endcase
 
-        // Для STA запретить RD
+        // STX, STY, STA
+        casex (I) 8'b100_xx1_10: D <= x; 8'b100_xx1_00: D <= y; default: D <= a; endcase
+
+        // Для STA запретить RD, но разрешить WR
         casex (I) 8'b100_xxx_01, 8'b100_xx1_x0: rd <= 1'b0; endcase
 
         // INC, DEC, STA, Сдвиговые
@@ -177,17 +194,17 @@ else if (ce) begin
     // Indirect, X: Читать из #D+X значение 16-битного адреса
     NDX:  begin t <= NDX2; cp <= Xi[7:0];   m  <= 1;  end
     NDX2: begin t <= NDX3; cp <= cpn;       tr <= I;  end
-    NDX3: begin t <= LAT;  cp <= itr;       R  <= rd; end
+    NDX3: begin t <= LAT;  cp <= itr;       {R,W} <= {rd,~rd}; end
 
     // Indirect, Y: Читать из (#D) 16 битный адрес + Y
     NDY:  begin t <= NDY2; cp <= I;         m  <= 1; end
     NDY2: begin t <= NDY3; cp <= cpn[7:0];  {cout,tr} <= Yi; end
-    NDY3: begin t <= NEXT; cp <= cpc;       R <= rd; end
+    NDY3: begin t <= NEXT; cp <= cpc;       {R,W} <= {rd,~rd}; end
 
     // ZP; ZPX; ZPY: Адресация ZeroPage
-    ZP:   begin t <= RUN;  cp <= I;       m <= 1; R <= rd; end
-    ZPX:  begin t <= LAT;  cp <= Xi[7:0]; m <= 1; R <= rd; end
-    ZPY:  begin t <= LAT;  cp <= Yi[7:0]; m <= 1; R <= rd; end
+    ZP:   begin t <= RUN;  cp <= I;       m <= 1; {R,W} <= {rd,~rd}; end
+    ZPX:  begin t <= LAT;  cp <= Xi[7:0]; m <= 1; {R,W} <= {rd,~rd}; end
+    ZPY:  begin t <= LAT;  cp <= Yi[7:0]; m <= 1; {R,W} <= {rd,~rd}; end
 
     // Absolute: 16-битный адрес
     ABS:  begin t <= ABS2; tr <= I; pc <= pcn; end
@@ -195,14 +212,14 @@ else if (ce) begin
 
         if (opcode == 8'h4C) // 3T JMP ABS
              begin t <= LOAD; pc <= itr; end
-        else begin t <= RUN;  cp <= itr; m <= 1; R <= rd; end
+        else begin t <= RUN;  cp <= itr; m <= 1; {R,W} <= {rd,~rd}; end
 
     end
 
     // Absolute,X: 16-битный адрес + X|Y
     ABX:  begin t <= ABXY; tr <= Xi[7:0]; pc <= pcn; cout <= Xi[8]; end
     ABY:  begin t <= ABXY; tr <= Yi[7:0]; pc <= pcn; cout <= Yi[8]; end
-    ABXY: begin t <= NEXT; cp <= cpc;     m <= 1;    R <= rd; end
+    ABXY: begin t <= NEXT; cp <= cpc;     m <= 1;    {R,W} <= {rd,~rd}; end
 
     // Условный переход
     // -------------------------------------------------------------
@@ -220,7 +237,29 @@ else if (ce) begin
 
     REL1: begin t <= REL2; end  // +2T если превышение границ
     REL2: begin t <= LOAD; end  // +1T если переход
+    LAT:  begin t <= RUN;  end  // +1T к такту
     // -------------------------------------------------------------
+
+    RUN: begin
+
+        m <= 0;
+        t <= LOAD;
+
+        // Immediate, PC+1
+        casex (opcode) 8'bxxx_010_x1, 8'b1xx_000_x0: pc <= pcn; endcase
+
+        casex (opcode)
+
+        // Инструкция STA,STX,STY [6T]
+        8'b100_xxx_01,
+        8'b100_xx1_x0: begin end
+
+        // Основное АЛУ [A + D]
+        8'bxxx_xxx_01: begin a <= ar[7:0]; p <= ap; end
+
+        endcase
+
+    end
 
     endcase
 

@@ -8,20 +8,21 @@ always #2.0 clock25     = ~clock25;
 initial begin reset_n = 0; clock = 0; clock25 = 0; #3.0 reset_n = 1; #12000 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 // ---------------------------------------------------------------------
-reg  [ 7:0] ram[65536];
+reg  [ 7:0] prg[65536];
 reg  [ 7:0] vmm[65536];
 reg  [ 7:0] oam[256];
-wire [15:0] address;
 wire [13:0] chra;
-reg  [ 7:0] chrd, in, oamd;
-wire [ 7:0] out, oama;
-wire        we;
+wire [ 7:0] oama;
+reg  [ 7:0] chrd, prgi, oamd;
+wire [15:0] A,    prga;
+wire [ 7:0] I, D, prgd;
+wire        R, W, prgw;
 // ---------------------------------------------------------------------
 wire        ce_cpu;
 // ---------------------------------------------------------------------
 initial begin
 
-    $readmemh("tb.hex", ram, 16'h0000);
+    $readmemh("pg.hex", prg, 16'h0000);
     $readmemh("ch.hex", vmm, 16'h0000);
     $readmemh("vm.hex", vmm, 16'h2000);
     $readmemh("sp.hex", oam,  8'h00);
@@ -31,11 +32,11 @@ end
 always @(posedge clock)
 begin
 
-    in   <= ram[address];
+    prgi <= prg[prga];
     chrd <= vmm[chra];
     oamd <= oam[oama];
 
-    if (we) ram[address] <= out;
+    if (prgw) prg[prga] <= prgd;
 
 end
 
@@ -45,10 +46,12 @@ cpu DendyCPU
 (
     .clock      (clock25),
     .reset_n    (reset_n),
-    .A          (address),
-    .I          (in),
-    .D          (out),
-    .W          (we)
+    .ce         (1'b1),   // ce_cpu
+    .A          (A),
+    .I          (I),
+    .D          (D),
+    .R          (R),
+    .W          (W)
 );
 
 // Видеопроцессор
@@ -58,10 +61,22 @@ ppu DendyPPU
     .clock25    (clock25),
     .reset_n    (reset_n),
     .ce_cpu     (ce_cpu),
+    // -- Видеопамять --
     .chra       (chra),
     .chrd       (chrd),
     .oama       (oama),
-    .oamd       (oamd)
+    .oamd       (oamd),
+    // -- Память PRG --
+    .prga       (prga),
+    .prgi       (prgi),
+    .prgd       (prgd),
+    .prgw       (prgw),
+    // -- Связь CPU --
+    .cpu_a      (A),
+    .cpu_i      (I),
+    .cpu_o      (D),
+    .cpu_w      (W),
+    .cpu_r      (R)
 );
 
 endmodule
