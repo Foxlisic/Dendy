@@ -27,7 +27,7 @@ localparam
     ZP   = 5'h08,  ZPX = 5'h09,  ZPY = 5'h0A, NDX2 = 5'h0B,
     NDX3 = 5'h0C,  LAT = 5'h0D, NDY2 = 5'h0E, NDY3 = 5'h0F,
     ABS2 = 5'h10, ABXY = 5'h11, REL1 = 5'h12, REL2 = 5'h13,
-    BRK  = 5'h14;
+    BRK  = 5'h14,  JSR = 5'h15, RTS  = 5'h16, RTI  = 5'h17;
 
 // Номер АЛУ
 localparam
@@ -170,6 +170,9 @@ else if (ce) begin
         src_r   <= SRC_D;   // DataIn
 
         casex (I)
+        8'b001_000_00: begin t <= JSR; end
+        8'b010_000_00: begin t <= RTI; end
+        8'b011_000_00: begin t <= RTS; end
         8'b000_000_00: begin t <= BRK; pc <= pc + 2; end
         8'bxxx_000_x1: begin t <= NDX; end  // Indirect,X
         8'bxxx_010_x1,
@@ -190,15 +193,23 @@ else if (ce) begin
 
         // АЛУ
         casex (I)
-        // Сравнение
-        8'hC0, 8'hC4, 8'hCC: begin alu <= CMP; dst_r <= DST_Y; end // CPY
-        8'hE0, 8'hE4, 8'hEC: begin alu <= CMP; dst_r <= DST_X; end // CPX
-        // TXA, TYA, TAX, TAY
+        // CPY
+        8'hC0,
+        8'hC4,
+        8'hCC: begin alu <= CMP; dst_r <= DST_Y; end
+        // CPX
+        8'hE0,
+        8'hE4,
+        8'hEC: begin alu <= CMP; dst_r <= DST_X; end
+        // TXA, TYA
         8'h8A: begin alu <= LDA; src_r <= SRC_X; end
         8'h98: begin alu <= LDA; src_r <= SRC_Y; end
+        // TAX, TAY
         8'hAA,
         8'hA8: begin alu <= LDA; src_r <= SRC_A; end
-        8'h24: begin alu <= BIT; end
+        // BIT
+        8'h24,
+        8'h2C: begin alu <= BIT; end
         // DEX, INX, DEY, INY
         8'hCA: begin alu <= DEC; src_r <= SRC_X; end
         8'hE8: begin alu <= INC; src_r <= SRC_X; end
@@ -304,7 +315,7 @@ else if (ce) begin
         // CP[XY] D :: BIT
         8'hC0,8'hC4,8'hC8,
         8'hE0,8'hE4,8'hE8,
-        8'h24: begin p <= ap; end
+        8'h24,8'h2C: begin p <= ap; end
 
         // TXS, TSX
         8'h9A: begin s <= x; end
@@ -319,13 +330,61 @@ else if (ce) begin
 
         endcase
 
+        // JMP [INDIRECT]
+        8'h6C: case (n)
+
+            0: begin n <= 1; m <= 1; t <= RUN; tr <= I; cp[7:0] <= cp[7:0] + 1; end
+            1: begin pc <= {I, tr}; end
+
+        endcase
+
+        // PHP, PHA
+        8'h08, 8'h48: if (n == 0) begin
+
+            t  <= RUN;
+            m  <= 1;
+            n  <= 1;
+            cp <= {8'h01, s};
+            D  <= opcode[6] ? a : (p | 8'h30);
+            W  <= 1;
+            s  <= s - 1;
+
+        end
+
+        // PLA, PLP
+        8'h68, 8'h28: case (n)
+
+            0: begin
+
+                t <= RUN;
+                n <= 1;
+                m <= 1;
+                s <= s + 1;
+
+                cp[15:8] <= 8'h01;
+                cp[ 7:0] <= s + 1;
+
+            end
+
+            1: begin
+
+                n <= 2;
+                t <= RUN;
+
+                if (opcode[5]) p <= I;
+                else     begin a <= I; p[ZF] <= I == 0; p[SF] <= I[7]; end
+
+            end
+
+        endcase
+
         endcase
 
     end
 
     // -------------------------------------------------------------
 
-    // 7T BRK, IRQ
+    // 7T BRK или IRQ
     BRK: case (n)
 
         // PUSH((PC >> 8) & 0xff);
@@ -339,6 +398,39 @@ else if (ce) begin
         4: begin n <= 5; cp[0] <= 1; tr <= I; end
         // GOTO ADDR
         5: begin n <= 6; pc <= {I, tr}; end
+
+    endcase
+
+    // [6T] Jump Subroutine
+    JSR: case (n)
+
+        0: begin n <= 1; tr <= I; pc <= pcn; cp[15:8] <= 8'h01; end
+        1: begin n <= 2; cp[7:0] <= s; s <= s - 1; D <= pc[15:8]; W <= 1; pc[15:8] <= I; m <= 1; end
+        2: begin n <= 3; cp[7:0] <= s; s <= s - 1; D <= pc[ 7:0]; W <= 1; end
+        3: begin n <= 4; pc[7:0] <= tr; end
+        4: begin m <= 0; t <= LOAD; end
+
+    endcase
+
+    // [6T] Возврат из процедуры
+    RTS: case (n)
+
+        0: begin n <= 1; m <= 1;        cp[7:0] <= s + 1; s <= s + 1; cp[15:8] <= 8'h01; end
+        1: begin n <= 2; pc[7:0] <= I;  cp[7:0] <= s + 1; s <= s + 1; end
+        2: begin n <= 3; pc      <= {I, pc[7:0]} + 1; end
+        3: begin n <= 4; m <= 0; end
+        4: begin t <= LOAD; end
+
+    endcase
+
+    // [6T] Возврат из прерывания
+    RTI: case (n)
+
+        0: begin n <= 1; cp[7:0]  <= s + 1; s <= s + 1; cp[15:8] <= 8'h01; m <= 1; end
+        1: begin n <= 2; cp[7:0]  <= s + 1; s <= s + 1; p <= I;   end
+        2: begin n <= 3; cp[7:0]  <= s + 1; s <= s + 1; pc[7:0] <= I; end
+        3: begin n <= 4; pc[15:8] <= I; end
+        4: begin t <= LOAD; end
 
     endcase
 
