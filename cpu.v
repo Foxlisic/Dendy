@@ -120,14 +120,14 @@ wire [7:0] ap =
 
     alu[3:1] == 3'b000_ || // ORA, AND
     alu[3:0] == 4'b0010 || // EOR
-    alu[3:1] == 3'b010_ || // STA, LDA :: INC, DEC
-    alu[3:1] == 4'b111_ ? {sf,       p[6:2], zf,    cin} :
+    alu[3:1] == 3'b010_ || // STA, LDA
+    alu[3:1] == 4'b111_ ? {sf,       p[6:2], zf,    cin} : // INC, DEC
     alu[3:0] == 4'b0011 ? {sf, oadc, p[5:2], zf,  carry} : // ADC
     alu[3:0] == 4'b0111 ? {sf, osbc, p[5:2], zf, ~carry} : // SBC
     alu[3:0] == 4'b0110 ? {sf,       p[6:2], zf, ~carry} : // CMP
     alu[3:1] == 3'b100_ ? {sf,       p[6:2], zf, src[7]} : // ASL, ROL
     alu[3:1] == 3'b101_ ? {sf,       p[6:2], zf, src[0]} : // LSR, ROR
-    alu[3:0] == 4'b1101 ? {dst[7:6], p[5:2], zf, cin} : 8'hFF; // BIT
+    alu[3:0] == 4'b1100 ? {src[7:6], p[5:2], zf,    cin} : 8'hFF; // BIT
 
 // Исполнение опкодов
 // ---------------------------------------------------------------------
@@ -138,8 +138,8 @@ if (reset_n == 1'b0) begin
 
     t   <= 0;
     m   <= 0;
-    a   <= 8'h13;
-    x   <= 8'h03;
+    a   <= 8'hC2;
+    x   <= 8'h83;
     y   <= 8'h02;
     s   <= 8'h00;
     //        SV     ZC
@@ -188,6 +188,29 @@ else if (ce) begin
         default:       begin t <= RUN; end
         endcase
 
+        // АЛУ
+        casex (I)
+        // Сравнение
+        8'hC0, 8'hC4, 8'hCC: begin alu <= CMP; dst_r <= DST_Y; end // CPY
+        8'hE0, 8'hE4, 8'hEC: begin alu <= CMP; dst_r <= DST_X; end // CPX
+        // TXA, TYA, TAX, TAY
+        8'h8A: begin alu <= LDA; src_r <= SRC_X; end
+        8'h98: begin alu <= LDA; src_r <= SRC_Y; end
+        8'hAA,
+        8'hA8: begin alu <= LDA; src_r <= SRC_A; end
+        8'h24: begin alu <= BIT; end
+        // DEX, INX, DEY, INY
+        8'hCA: begin alu <= DEC; src_r <= SRC_X; end
+        8'hE8: begin alu <= INC; src_r <= SRC_X; end
+        8'h88: begin alu <= DEC; src_r <= SRC_Y; end
+        8'hC8: begin alu <= INC; src_r <= SRC_Y; end
+        // Сдвиги
+        8'b0xx_xx1_10: begin alu <= ASL + I[6:5]; end
+        8'b0xx_010_10: begin alu <= ASL + I[6:5]; src_r <= SRC_A; end
+        // INC, DEC
+        8'b11x_xx1_10: begin alu <= DEC + I[5]; end
+        endcase
+
         // STX, STY, STA: Выбор источника для записи в память
         casex (I) 8'b100_xx1_10: D <= x; 8'b100_xx1_00: D <= y; default: D <= a; endcase
 
@@ -196,15 +219,6 @@ else if (ce) begin
 
         // INC, DEC, STA, Сдвиговые всегда добавляют +1Т к ABS,XY; IND,Y
         casex (I) 8'b100xxxxx, 8'b11xxx110, 8'b0xxxx110: cnext <= 1; endcase
-
-        casex (I)
-        // Сравнение
-        8'hC0, 8'hC4, 8'hC8: begin alu <= CMP; dst_r <= DST_Y; end // CPY
-        8'hE0, 8'hE4, 8'hE8: begin alu <= CMP; dst_r <= DST_X; end // CPX
-        // Сдвиги
-        8'b0xx_xx1_10: begin alu <= ASL + I[6:5]; end
-        8'b0xx_010_10: begin alu <= ASL + I[6:5]; src_r <= SRC_A; end
-        endcase
 
     end
 
@@ -278,20 +292,27 @@ else if (ce) begin
         8'b101_110_00: p[VF] <= 1'b0;
         8'b11x_110_00: p[DF] <= opcode[5];
 
-        // АЛУ [dst,D]; Сдвиги ACC
+        // АЛУ [dst,D]; Сдвиги ACC; TRANSFER
         8'bxxx_xxx_01,
-        8'b0xx_010_10: begin a <= ar[7:0]; p <= ap; end
+        8'b0xx_010_10,
+        8'h8A, 8'h98: begin a <= ar[7:0]; p <= ap; end
 
-        // LDX, LDY
-        8'hA2, 8'hA6, 8'hAE, 8'hB6, 8'hBE: begin x <= ar[7:0]; p <= ap; end
-        8'hA0, 8'hA4, 8'hAC, 8'hB4, 8'hBC: begin y <= ar[7:0]; p <= ap; end
+        // LDX, LDY, TAX, TAY, DEX, DEY, INX, INY
+        8'b101_xx1_10, 8'hA2, 8'hAA, 8'hCA, 8'hE8: begin x <= ar[7:0]; p <= ap; end
+        8'b101_xx0_10, 8'hA0, 8'hA8, 8'h88, 8'hC8: begin y <= ar[7:0]; p <= ap; end
 
-        // CP[XY] D
+        // CP[XY] D :: BIT
         8'hC0,8'hC4,8'hC8,
-        8'hE0,8'hE4,8'hE8: begin p <= ap; end
+        8'hE0,8'hE4,8'hE8,
+        8'h24: begin p <= ap; end
+
+        // TXS, TSX
+        8'h9A: begin s <= x; end
+        8'hBA: begin x <= s; p[ZF] <= (s == 0); p[SF] <= s[7]; end
 
         // Сдвиги, INC, DEC: Запись в память
-        8'b0xx_xx1_10: case (n)
+        8'b0xx_xx1_10,
+        8'b11x_xx1_10: case (n)
 
             0: begin n <= 1; t <= RUN; W <= 1; D <= ar; p <= ap; end
             1: begin n <= 2; t <= RUN; end
