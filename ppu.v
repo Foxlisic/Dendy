@@ -3,6 +3,8 @@
 /* verilator lint_off CASEX */
 /* verilator lint_off CASEOVERLAP */
 
+`define NMI_ENABLE 0
+
 /**
  * Формирование видеосигнала на VGA 800 x 525
  * Однако, работают по таймингам 341 x 262
@@ -467,7 +469,7 @@ begin
             end
 
             // Генерация обратного синхроимпульса
-            if (px == 0 && py == 257) begin nmi <= ctrl0[7]; vsync <= 1; end
+            if (px == 0 && py == 257) begin vsync <= 1; nmi <= `NMI_ENABLE & ctrl0[7]; end
 
             // Кадр начинается с позиции PY=15, так как 33 пикселя сверху идут для VGA как VBlank
             // Вернуть вертикальным счетчикам  значение из `t` для рисования нового кадра [vert]
@@ -517,7 +519,11 @@ begin
 
                     casex (cpu_a)
                     // 4014 DMA
-                    16'b0100_0000_0001_0100: begin prga <= {cpu_o, 8'h00}; oam2a <= 0; end
+                    16'b0100_0000_0001_0100: if (cpu_w) begin prga <= {cpu_o, 8'h00}; oam2a <= 0; end
+
+                    // 4016 JOYSTICK, запрос данных
+                    16'b0100_0000_0001_0110: if (cpu_w) begin end
+
                     // Регистры видео
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
 
@@ -630,6 +636,9 @@ begin
 
                     // $4014 DMA: Активация записи в OAM из MEMORY
                     16'b0100_0000_0001_0100: if (cpu_w) begin dma <= 1; end
+
+                    // 4016 JOYSTICK
+                    16'b0100_0000_0001_0110: if (cpu_r) begin cpu_i <= 8'hFF; end
 
                     // Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])

@@ -144,7 +144,7 @@ public:
                 cnt_chr_rom = ines[5];
 
                 // Читать программную память
-                fread(program, cnt_prg_rom, 16384, fp);
+                fread(program, 1, cnt_prg_rom * 16384, fp);
 
                 if (cnt_prg_rom == 1) {
                     for (int i = 0; i < 0x4000; i++) {
@@ -294,7 +294,7 @@ public:
 
         // Чтение CHR или ATTR для CPU
         if (ppu->vida >= 0x2000 && ppu->vida < 0x3000) {
-            ppu->vidi  = videom[ppu->vida & 0x1FFF];
+            ppu->vidi  = videom[0x2000 + (ppu->vida & 0x1FFF)];
         } else if (ppu->vida < 0x2000) {
             ppu->vidi  = videom[ppu->vida];
         }
@@ -324,15 +324,18 @@ public:
 
         // Состояние ДО выполнения такта CPU
 
-        if (0 && cpu->ce) {
+        if (cpu->ce) {
 
             disam(cpu->A);
-            printf("%c%04X R-%02X %s%02X [%04X %c] %s\n",
+            printf("%c%04X R-%02X %s%02X A-%02X X-%02X Y-%02X P-%02X [%04X %c] %s\n",
                 (cpu->m0 ? '*' : ' '),
                 cpu->A,
                 cpu->I,
                 (cpu->W ? "W-" : "  "),
                 cpu->D,
+                // --
+                cpu->_a, cpu->_x, cpu->_y, cpu->_p,
+                //
                 ppu->vida,
                 (cpu->nmi ? 'w' : ' '),
                 cpu->m0 ? ds : ""

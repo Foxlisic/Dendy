@@ -16,6 +16,11 @@ module cpu
     input               ce,         // ChipEnabled
     input               nmi,        // Из PPU
     output              m0,         // Такт #0
+    // --- Дебаг ---
+    output      [ 7:0]  _a,
+    output      [ 7:0]  _x,
+    output      [ 7:0]  _y,
+    output      [ 7:0]  _p,
     // --- Интерфейс работы с памятью ---
     output      [15:0]  A,          // Адрес
     input       [ 7:0]  I,          // Данные
@@ -26,6 +31,7 @@ module cpu
 
 assign A  = m ? cp : pc;
 assign m0 = (t == LOAD);
+assign {_a, _x, _y, _p} = {a, x, y, p};
 
 // Объявления
 // ---------------------------------------------------------------------
@@ -323,19 +329,9 @@ else if (ce) begin
         casex (opcode) 8'bxxx_010_x1, 8'b1xx_000_x0: pc <= pcn; endcase
         casex (opcode)
 
-        // Инструкция [6T] STA,STX,STY
-        8'b100_xxx_01, 8'b100_xx1_x0: begin end
-
-        // CLC, SEC; CLI, SEI; CLV; CLD, SED
-        8'b00x_110_00: p[CF] <= opcode[5];
-        8'b01x_110_00: p[IF] <= opcode[5];
-        8'b101_110_00: p[VF] <= 1'b0;
-        8'b11x_110_00: p[DF] <= opcode[5];
-
-        // АЛУ [dst,D]; Сдвиги ACC; TRANSFER
-        8'bxxx_xxx_01,
-        8'b0xx_010_10,
-        8'h8A, 8'h98: begin a <= ar[7:0]; p <= ap; end
+        // TXS, TSX
+        8'h9A: begin s <= x; end
+        8'hBA: begin x <= s; p[ZF] <= (s == 0); p[SF] <= s[7]; end
 
         // LDX, LDY, TAX, TAY, DEX, DEY, INX, INY
         8'b101_xx1_10, 8'hA2, 8'hAA, 8'hCA, 8'hE8: begin x <= ar[7:0]; p <= ap; end
@@ -346,9 +342,19 @@ else if (ce) begin
         8'hE0,8'hE4,8'hE8,
         8'h24,8'h2C: begin p <= ap; end
 
-        // TXS, TSX
-        8'h9A: begin s <= x; end
-        8'hBA: begin x <= s; p[ZF] <= (s == 0); p[SF] <= s[7]; end
+        // Инструкция [6T] STA,STX,STY
+        8'b100_xxx_01, 8'b100_xx1_x0: begin end
+
+        // CLC, SEC; CLI, SEI; CLV; CLD, SED
+        8'b00x_110_00: p[CF] <= opcode[5];
+        8'b01x_110_00: p[IF] <= opcode[5];
+        8'b101_110_00: p[VF] <= 1'b0;
+        8'b11x_110_00: p[DF] <= opcode[5];
+
+        // АЛУ [dst,D]; Сдвиги ACC; TRANSFER
+        8'bxxx_xxx_01: begin p <= ap; if (alu != CMP) a <= ar[7:0]; end
+        8'b0xx_010_10,
+        8'h8A, 8'h98: begin a <= ar[7:0]; p <= ap; end
 
         // Сдвиги, INC, DEC: Запись в память
         8'b0xx_xx1_10,
@@ -400,8 +406,8 @@ else if (ce) begin
                 n <= 2;
                 t <= RUN;
 
-                if (opcode[5]) p <= I;
-                else     begin a <= I; p[ZF] <= I == 0; p[SF] <= I[7]; end
+                if (opcode[5]) begin a <= I; p[ZF] <= I == 0; p[SF] <= I[7]; end
+                else           begin p <= I; end
 
             end
 
