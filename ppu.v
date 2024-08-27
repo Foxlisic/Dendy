@@ -1,5 +1,7 @@
 /* verilator lint_off WIDTHEXPAND */
 /* verilator lint_off WIDTHTRUNC */
+/* verilator lint_off CASEX */
+/* verilator lint_off CASEOVERLAP */
 
 /**
  * Формирование видеосигнала на VGA 800 x 525
@@ -560,7 +562,7 @@ begin
 
                             if (w == 0) begin
 
-                                va[15:8] <= cpu_o;
+                                va[14:8] <= cpu_o[6:0];
                                 t[13:8]  <= cpu_o[5:0];
                                 t[14]    <= 1'b0;
 

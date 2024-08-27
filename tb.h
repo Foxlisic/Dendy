@@ -19,6 +19,7 @@ protected:
     uint8_t*    videom;
     uint8_t*    chrrom;
     uint8_t*    program;
+    uint8_t     ram[2048];
     uint8_t     oam[256];
     uint8_t     x2line[256];
 
@@ -27,6 +28,7 @@ protected:
 
     // Модули
     Vppu*       ppu;
+    Vcpu*       cpu;
 
 public:
 
@@ -65,10 +67,19 @@ public:
 
         // Модуль PPU
         ppu = new Vppu;
+        cpu = new Vcpu;
+
         ppu->reset_n = 0;
         ppu->clock25 = 0; ppu->eval();
         ppu->clock25 = 1; ppu->eval();
         ppu->reset_n = 1;
+
+        cpu->reset_n = 0;
+        cpu->clock   = 0; cpu->eval();
+        cpu->clock   = 1; cpu->eval();
+        cpu->reset_n = 1;
+
+        for (int i = 0; i < 256*1024; i++) program[i] = 0;
 
         // Загрузка NES-файла
         if (argc > 1) {
@@ -181,6 +192,28 @@ public:
         instr = instr < 1000 ? 1000 : instr;
     }
 
+    uint8_t read(uint16_t A)
+    {
+        // Оперативная память
+        if (A < 0x2000) {
+            return ram[A & 0x7FF];
+        }
+        // Память программ
+        else if (A >= 0x8000) {
+            return program[A & 0x7FFF];
+        }
+
+        return 0xFF;
+    }
+
+    // Писать можно только в память
+    void write(uint16_t A, uint8_t D)
+    {
+        if (A < 0x2000) {
+            ram[A & 0x7FF] = D;
+        }
+    }
+
     // 1 Такт
     void tick()
     {
@@ -190,21 +223,43 @@ public:
 
         uint16_t PA = ppu->chra;
 
-        // Чтение из CHR-ROM
+        // Знакогенератор CHR-ROM и видеопамять
         if (PA < 0x2000) {
             ppu->chrd = chrrom[PA];
-        }
-        // Зеркалирование VRAM [2 страницы]
-        else if (PA < 0x3F00) {
-            ppu->chrd = videom[(PA & 0x07FF) | 0x2000];
+        } else if (PA < 0x3F00) {
+            ppu->chrd = videom[(PA & 0x07FF) | 0x2000]; // Зеркалирование VRAM [2 страницы]
         }
 
         // Чтение OAM
         ppu->oamd = oam[ppu->oama];
 
-        // --- Исполнение тактов ---
+        // -----------------------------------
+
+        // -- PPU здесь --
         ppu->clock25 = 0; ppu->eval();
         ppu->clock25 = 1; ppu->eval();
+
+        // Запись и чтение в зависимости от мапперов
+        if (ppu->prgw) { write(ppu->prga, ppu->prgd); }
+
+        // Читаться для PPU, не CPU.
+        ppu->prgi = read(ppu->prga);
+
+        // Для CPU данные готовятся в PPU
+        cpu->I   = ppu->cpu_i;
+        cpu->ce  = ppu->ce_cpu;
+        cpu->nmi = ppu->nmi;
+        cpu->clock = 0; cpu->eval();
+        cpu->clock = 1; cpu->eval();
+
+        // Подготовка данных для PPU
+        ppu->cpu_a = cpu->A;
+        ppu->cpu_o = cpu->D;
+        ppu->cpu_w = cpu->W;
+        ppu->cpu_r = cpu->R;
+
+        // Состояние после выполнения такта CPU. R показывает на следующие данные для чтения
+        if (0 && cpu->ce) printf("%c%04x R-%02x %s%02x\n", (cpu->m0 ? '*' : ' '), cpu->A, cpu->I, (cpu->W ? "W-" : "  "), cpu->D);
 
         vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
     }

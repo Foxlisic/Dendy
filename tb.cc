@@ -1,4 +1,5 @@
 #include <verilated.h>
+#include "obj_dir/Vcpu.h"
 #include "obj_dir/Vppu.h"
 
 #include "tb.h"
