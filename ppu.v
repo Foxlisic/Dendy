@@ -106,6 +106,7 @@ reg  [14:0] va;
 reg  [ 7:0] vidch;
 reg         w = 0;
 reg         dma = 0;
+reg         vsync;
 reg  [ 1:0] ct_cpu = 0;
 reg  [ 2:0] finex = 0, _finex = 0;
 reg  [ 7:0] ctrl0;              // $2000
@@ -213,6 +214,7 @@ begin
     ce_ppu      <= 0;
     ct_cpu      <= 0;
     vidch       <= 8'hFF;
+    vsync       <= 0;
 
     dma         <= 0;
     oama        <= 0;
@@ -228,7 +230,7 @@ begin
 
     //               4
     ctrl0   <= 8'b0001_0000;
-    ctrl1   <= 8'b0001_1110;
+    ctrl1   <= 8'b0000_1110;
 
     // Палитра фона
     bgpal[ 0] <= 6'h0F; bgpal[ 1] <= 6'h16; bgpal[ 2] <= 6'h30; bgpal[ 3] <= 6'h38;
@@ -465,7 +467,7 @@ begin
             end
 
             // Генерация обратного синхроимпульса
-            if (px == 0 && py == 256) begin nmi <= ctrl0[7]; end
+            if (px == 0 && py == 257) begin nmi <= ctrl0[7]; vsync <= 1; end
 
             // Кадр начинается с позиции PY=15, так как 33 пикселя сверху идут для VGA как VBlank
             // Вернуть вертикальным счетчикам  значение из `t` для рисования нового кадра [vert]
@@ -475,6 +477,7 @@ begin
 
                 oam_hit <= 0;
                 nmi     <= 0;
+                vsync   <= 0;
 
             end
 
@@ -513,9 +516,6 @@ begin
                     prgd <= cpu_o;
 
                     casex (cpu_a)
-                    // $3F00-$3F1F Палитры
-                    16'b0011_1111_0000_xxxx: bgpal[cpu_a[3:0]] <= cpu_o;
-                    16'b0011_1111_0001_xxxx: sppal[cpu_a[3:0]] <= cpu_o;
                     // 4014 DMA
                     16'b0100_0000_0001_0100: begin prga <= {cpu_o, 8'h00}; oam2a <= 0; end
                     // Регистры видео
@@ -528,7 +528,9 @@ begin
                         // Состояние видеопроцессора
                         2: if (cpu_r) begin
 
-                            cpu_i   <= {nmi, oam_hit, oam_id[3], (px < 32 || px >= 32+256) || py < 16 || py >= 256, 4'b0000};
+                            // (px < 32 || px >= 32+256) || py < 16 || py >= 256
+                            cpu_i   <= {vsync, oam_hit, oam_id[3], 1'b1, 4'b0000};
+                            vsync   <= 0;
                             oam_hit <= 0;
                             w       <= 0;
 
@@ -582,6 +584,11 @@ begin
 
                             if (cpu_w) begin
 
+                                // $3F00-$3F1F Палитры
+                                if      (va >= 16'h3F00 && va < 16'h3F10) bgpal[va[3:0]] <= cpu_o;
+                                else if (va >= 16'h3F10 && va < 16'h3F20) sppal[va[3:0]] <= cpu_o;
+                                else vidw <= 1;
+
                                 vida <= va;
                                 vido <= cpu_o;
                                 vidw <= 1;
@@ -590,6 +597,10 @@ begin
 
                                 vida  <= va;
                                 cpu_i <= vidch;
+
+                                // $3F00-$3F1F Палитры
+                                if      (va >= 16'h3F00 && va < 16'h3F10) cpu_i <= bgpal[va[3:0]];
+                                else if (va >= 16'h3F10 && va < 16'h3F20) cpu_i <= sppal[va[3:0]];
 
                             end
 
@@ -617,13 +628,8 @@ begin
 
                     casex (cpu_a)
 
-                    // Палитры
-                    16'b0011_1111_0000_xxxx: cpu_i <= bgpal[cpu_a[3:0]];
-                    16'b0011_1111_0001_xxxx: cpu_i <= sppal[cpu_a[3:0]];
-                    16'b0011_1111_xxxx_xxxx: cpu_i <= 8'h00;
-
                     // $4014 DMA: Активация записи в OAM из MEMORY
-                    16'b0100_0000_0001_0100: begin dma <= 1; end
+                    16'b0100_0000_0001_0100: if (cpu_w) begin dma <= 1; end
 
                     // Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])

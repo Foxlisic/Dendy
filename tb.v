@@ -8,12 +8,14 @@ always #2.0 clock25     = ~clock25;
 initial begin reset_n = 0; clock = 0; clock25 = 0; #3.0 reset_n = 1; #12000 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 // ---------------------------------------------------------------------
+wire debugcpu = 1;
+// ---------------------------------------------------------------------
 reg  [ 7:0] prg[65536];
 reg  [ 7:0] vmm[65536];
 reg  [ 7:0] oam[256];
 wire [14:0] chra, vida;
 wire [ 7:0] oama, oam2a, vido;
-reg  [ 7:0] chrd, prgi, oamd, oam2i, vidi;
+reg  [ 7:0] chrd, prgi, oamd, oam2i, vidi, Ix;
 wire [15:0] A,    prga;
 wire [ 7:0] I, D, prgd, oam2o;
 wire        R, W, prgw, oam2w;
@@ -42,9 +44,11 @@ begin
     oam2i <= oam[oam2a];
     vidi  <= vmm[vida];
 
-    if (prgw)  prg[prga] <= prgd;
+    // if (prgw)  prg[prga]  <= prgd;
     if (oam2w) oam[oam2a] <= oam2o;
-    if (vidw)  vmm[vida] <= vido;
+    if (vidw)  vmm[vida]  <= vido;
+
+    Ix <= prg[A]; if (W) prg[A] <= D;
 
 end
 
@@ -54,10 +58,10 @@ cpu DendyCPU
 (
     .clock      (clock25),
     .reset_n    (reset_n),
-    .ce         (ce_cpu),
+    .ce         (debugcpu | ce_cpu), //
     .nmi        (nmi),
     .A          (A),
-    .I          (I),
+    .I          (debugcpu ? Ix : I),
     .D          (D),
     .R          (R),
     .W          (W)

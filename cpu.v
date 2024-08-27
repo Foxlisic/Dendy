@@ -172,8 +172,6 @@ else if (ce) begin
     // Загрузка опкода
     LOAD: begin
 
-        nmitr <= nmi;
-
         cout    <= 0;
         cnext   <= 0;       // =1 Некоторые инструкции удлиняют такт +1
         rd      <= 1;       // =1 Используется для запроса чтения из PPU
@@ -184,10 +182,10 @@ else if (ce) begin
         src_r   <= SRC_D;   // DataIn
 
         // Прерывание NMI: срабатывает на восходящем сигнале
-        if (nmitr != nmi && nmi) begin
+        if (nmitr ^ nmi && nmi) begin
 
-            t    <= BRK;
-            intr <= IRQ_NMI;
+            t     <= BRK;
+            intr  <= IRQ_NMI;
 
         end else
         // Считывание опкода
@@ -260,25 +258,27 @@ else if (ce) begin
 
         end
 
+        nmitr <= nmi;
+
     end
 
     // Вычисление эффективного адреса
     // -------------------------------------------------------------
 
     // Indirect, X: Читать из #D+X значение 16-битного адреса
-    NDX:  begin t <= NDX2; cp <= Xi[7:0];   m  <= 1;  end
-    NDX2: begin t <= NDX3; cp <= cpn;       tr <= I;  end
+    NDX:  begin t <= NDX2; cp <= Xi[7:0];   pc <= pcn; m  <= 1; end
+    NDX2: begin t <= NDX3; cp <= cpn;       tr <= I;   end
     NDX3: begin t <= LAT;  cp <= itr;       {R,W} <= {rd,~rd}; end
 
     // Indirect, Y: Читать из (#D) 16 битный адрес + Y
-    NDY:  begin t <= NDY2; cp <= I;         m  <= 1; end
+    NDY:  begin t <= NDY2; cp <= I;         m  <= 1; pc <= pcn; end
     NDY2: begin t <= NDY3; cp <= cpn[7:0];  {cout,tr} <= Yi; end
     NDY3: begin t <= NEXT; cp <= cpc;       {R,W} <= {rd,~rd}; end
 
     // ZP; ZPX; ZPY: Адресация ZeroPage
-    ZP:   begin t <= RUN;  cp <= I;       m <= 1; {R,W} <= {rd,~rd}; end
-    ZPX:  begin t <= LAT;  cp <= Xi[7:0]; m <= 1; {R,W} <= {rd,~rd}; end
-    ZPY:  begin t <= LAT;  cp <= Yi[7:0]; m <= 1; {R,W} <= {rd,~rd}; end
+    ZP:   begin t <= RUN;  cp <= I;       m <= 1; {R,W} <= {rd,~rd}; pc <= pcn; end
+    ZPX:  begin t <= LAT;  cp <= Xi[7:0]; m <= 1; {R,W} <= {rd,~rd}; pc <= pcn; end
+    ZPY:  begin t <= LAT;  cp <= Yi[7:0]; m <= 1; {R,W} <= {rd,~rd}; pc <= pcn; end
 
     // Absolute: 16-битный адрес
     ABS:  begin t <= ABS2; tr <= I; pc <= pcn; end
@@ -293,7 +293,7 @@ else if (ce) begin
     // Absolute,X: 16-битный адрес + X|Y
     ABX:  begin t <= ABXY; tr <= Xi[7:0]; pc <= pcn; cout <= Xi[8]; end
     ABY:  begin t <= ABXY; tr <= Yi[7:0]; pc <= pcn; cout <= Yi[8]; end
-    ABXY: begin t <= NEXT; cp <= cpc;     m <= 1;    {R,W} <= {rd,~rd}; end
+    ABXY: begin t <= NEXT; cp <= cpc;     pc <= pcn; m <= 1; {R,W} <= {rd,~rd}; end
 
     // Условный переход
     // -------------------------------------------------------------
@@ -354,7 +354,7 @@ else if (ce) begin
         8'b0xx_xx1_10,
         8'b11x_xx1_10: case (n)
 
-            0: begin n <= 1; t <= RUN; W <= 1; D <= ar; p <= ap; end
+            0: begin n <= 1; t <= RUN; W <= 1; D <= ar; p <= ap; m <= 1; end
             1: begin n <= 2; t <= RUN; end
 
         endcase

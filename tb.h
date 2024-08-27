@@ -1,5 +1,54 @@
 #include <SDL2/SDL.h>
 
+enum OpTypes {
+    ___ = 0,
+    IMP = 1, NDX =  2, NDY =  3, ZP  =  4, ZPX =  5, ZPY =  6, IMM =  7,
+    ABS = 8, ABX =  9, ABY = 10, ACC = 11, REL = 12, IND = 13,
+};
+
+static const char* OPTABLE[256] =
+{
+    /*        00  01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F */
+    /* 00 */ "BRK", "ORA", "___", "SLO", "DOP", "ORA", "ASL", "SLO", "PHP", "ORA", "ASL", "AAC", "DOP", "ORA", "ASL", "SLO",
+    /* 10 */ "BPL", "ORA", "___", "SLO", "DOP", "ORA", "ASL", "SLO", "CLC", "ORA", "NOP", "SLO", "DOP", "ORA", "ASL", "SLO",
+    /* 20 */ "JSR", "AND", "___", "RLA", "BIT", "AND", "ROL", "RLA", "PLP", "AND", "ROL", "AAC", "BIT", "AND", "ROL", "RLA",
+    /* 30 */ "BMI", "AND", "___", "RLA", "DOP", "AND", "ROL", "RLA", "SEC", "AND", "NOP", "RLA", "DOP", "AND", "ROL", "RLA",
+    /* 40 */ "RTI", "EOR", "___", "SRE", "DOP", "EOR", "LSR", "SRE", "PHA", "EOR", "LSR", "ASR", "JMP", "EOR", "LSR", "SRE",
+    /* 50 */ "BVC", "EOR", "___", "SRE", "DOP", "EOR", "LSR", "SRE", "CLI", "EOR", "NOP", "SRE", "DOP", "EOR", "LSR", "SRE",
+    /* 60 */ "RTS", "ADC", "___", "RRA", "DOP", "ADC", "ROR", "RRA", "PLA", "ADC", "ROR", "ARR", "JMP", "ADC", "ROR", "RRA",
+    /* 70 */ "BVS", "ADC", "___", "RRA", "DOP", "ADC", "ROR", "RRA", "SEI", "ADC", "NOP", "RRA", "DOP", "ADC", "ROR", "RRA",
+    /* 80 */ "DOP", "STA", "DOP", "AAX", "STY", "STA", "STX", "AAX", "DEY", "DOP", "TXA", "XAA", "STY", "STA", "STX", "AAX",
+    /* 90 */ "BCC", "STA", "___", "AXA", "STY", "STA", "STX", "AAX", "TYA", "STA", "TXS", "AAX", "SYA", "STA", "SXA", "AAX",
+    /* A0 */ "LDY", "LDA", "LDX", "LAX", "LDY", "LDA", "LDX", "LAX", "TAY", "LDA", "TAX", "ATX", "LDY", "LDA", "LDX", "LAX",
+    /* B0 */ "BCS", "LDA", "___", "LAX", "LDY", "LDA", "LDX", "LAX", "CLV", "LDA", "TSX", "LAX", "LDY", "LDA", "LDX", "LAX",
+    /* C0 */ "CPY", "CMP", "DOP", "DCP", "CPY", "CMP", "DEC", "DCP", "INY", "CMP", "DEX", "AXS", "CPY", "CMP", "DEC", "DCP",
+    /* D0 */ "BNE", "CMP", "___", "DCP", "DOP", "CMP", "DEC", "DCP", "CLD", "CMP", "NOP", "DCP", "DOP", "CMP", "DEC", "DCP",
+    /* E0 */ "CPX", "SBC", "DOP", "ISC", "CPX", "SBC", "INC", "ISC", "INX", "SBC", "NOP", "SBC", "CPX", "SBC", "INC", "ISC",
+    /* F0 */ "BEQ", "SBC", "___", "ISC", "DOP", "SBC", "INC", "ISC", "SED", "SBC", "NOP", "ISC", "DOP", "SBC", "INC", "ISC"
+};
+
+// Типы операндов для каждого опкода
+static const int OPTYPES[256] =
+{
+    /*       00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F */
+    /* 00 */ IMP, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, ABS, ABS, ABS, ABS,
+    /* 10 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 20 */ ABS, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, ABS, ABS, ABS, ABS,
+    /* 30 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 40 */ IMP, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, ABS, ABS, ABS, ABS,
+    /* 50 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 60 */ IMP, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, IND, ABS, ABS, ABS,
+    /* 70 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 80 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* 90 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPY, ZPY, IMP, ABY, IMP, ABY, ABX, ABX, ABY, ABX,
+    /* A0 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* B0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPY, ZPY, IMP, ABY, IMP, ABY, ABX, ABX, ABY, ABY,
+    /* C0 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* D0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* E0 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* F0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX
+};
+
 class TB
 {
 protected:
@@ -22,6 +71,8 @@ protected:
     uint8_t     ram[2048];
     uint8_t     oam[256];
     uint8_t     x2line[256];
+
+    char        ds[256];
 
     int         cnt_prg_rom;
     int         cnt_chr_rom;
@@ -93,11 +144,11 @@ public:
                 cnt_chr_rom = ines[5];
 
                 // Читать программную память
-                fread(program + 0xC000, cnt_prg_rom, 16384, fp);
+                fread(program, cnt_prg_rom, 16384, fp);
 
                 if (cnt_prg_rom == 1) {
                     for (int i = 0; i < 0x4000; i++) {
-                        program[i + 0x8000] = program[i + 0xC000];
+                        program[i + 0x4000] = program[i];
                     }
                 }
 
@@ -223,34 +274,32 @@ public:
 
         uint16_t PA = ppu->chra;
 
-        // Знакогенератор CHR-ROM и видеопамять
+        // Знакогенератор CHR-ROM и видеопамять для PPU
         if (PA < 0x2000) {
             ppu->chrd = chrrom[PA];
         } else if (PA < 0x3F00) {
             ppu->chrd = videom[(PA & 0x07FF) | 0x2000]; // Зеркалирование VRAM [2 страницы]
         }
 
-        // Чтение OAM
-        ppu->oamd = oam[ppu->oama];
+        // Запись в OAM
+        if (ppu->oam2w) { oam[ppu->oam2a] = ppu->oam2o; }
+
+        if (ppu->vida >= 0x2000 && ppu->vida < 0x3000 && ppu->vidw) {
+            videom[0x2000 + (ppu->vida & 0x1FFF)] = ppu->vido;
+        }
+
+        // Чтение OAM, CHR
+        ppu->oamd  = oam[ppu->oama];
+        ppu->oam2i = oam[ppu->oam2a];
+
+        // Чтение CHR или ATTR для CPU
+        if (ppu->vida >= 0x2000 && ppu->vida < 0x3000) {
+            ppu->vidi  = videom[ppu->vida & 0x1FFF];
+        } else if (ppu->vida < 0x2000) {
+            ppu->vidi  = videom[ppu->vida];
+        }
 
         // -----------------------------------
-
-        // -- PPU здесь --
-        ppu->clock25 = 0; ppu->eval();
-        ppu->clock25 = 1; ppu->eval();
-
-        // Запись и чтение в зависимости от мапперов
-        if (ppu->prgw) { write(ppu->prga, ppu->prgd); }
-
-        // Читаться для PPU, не CPU.
-        ppu->prgi = read(ppu->prga);
-
-        // Для CPU данные готовятся в PPU
-        cpu->I   = ppu->cpu_i;
-        cpu->ce  = ppu->ce_cpu;
-        cpu->nmi = ppu->nmi;
-        cpu->clock = 0; cpu->eval();
-        cpu->clock = 1; cpu->eval();
 
         // Подготовка данных для PPU
         ppu->cpu_a = cpu->A;
@@ -258,8 +307,43 @@ public:
         ppu->cpu_w = cpu->W;
         ppu->cpu_r = cpu->R;
 
-        // Состояние после выполнения такта CPU. R показывает на следующие данные для чтения
-        if (0 && cpu->ce) printf("%c%04x R-%02x %s%02x\n", (cpu->m0 ? '*' : ' '), cpu->A, cpu->I, (cpu->W ? "W-" : "  "), cpu->D);
+        // Читаться для PPU, не CPU.
+        ppu->prgi = read(ppu->prga);
+
+        // Запись и чтение в зависимости от мапперов
+        if (ppu->prgw) { write(ppu->prga, ppu->prgd); }
+
+        // -- PPU здесь --
+        ppu->clock25 = 0; ppu->eval();
+        ppu->clock25 = 1; ppu->eval();
+
+        // Для CPU данные готовятся в PPU
+        cpu->I   = ppu->cpu_i;
+        cpu->ce  = ppu->ce_cpu;
+        cpu->nmi = ppu->nmi;
+
+        // Состояние ДО выполнения такта CPU
+
+        if (0 && cpu->ce) {
+
+            disam(cpu->A);
+            printf("%c%04X R-%02X %s%02X [%04X %c] %s\n",
+                (cpu->m0 ? '*' : ' '),
+                cpu->A,
+                cpu->I,
+                (cpu->W ? "W-" : "  "),
+                cpu->D,
+                ppu->vida,
+                (cpu->nmi ? 'w' : ' '),
+                cpu->m0 ? ds : ""
+            );
+        }
+
+        if (1 || cpu->A != 0xC2EF) {
+
+            cpu->clock = 0; cpu->eval();
+            cpu->clock = 1; cpu->eval();
+        }
 
         vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
     }
@@ -300,5 +384,29 @@ public:
 
         // Вывод на экран
         pset(x-48-2, y-33-2, cl);
+    }
+
+    void disam(int a)
+    {
+        int a1 = read(a),
+            a2 = read(a + 1),
+            a3 = read(a + 2);
+
+        switch (OPTYPES[a1])
+        {
+            case IMP: sprintf(ds, "%s",             OPTABLE[a1]); break;
+            case NDX: sprintf(ds, "%s (%02X+X)",    OPTABLE[a1], a2); break;
+            case NDY: sprintf(ds, "%s (%02X),Y",    OPTABLE[a1], a2); break;
+            case ZP:  sprintf(ds, "%s (%02X)",      OPTABLE[a1], a2); break;
+            case ZPX: sprintf(ds, "%s (%02X+X)",    OPTABLE[a1], a2); break;
+            case ZPY: sprintf(ds, "%s (%02X+Y)",    OPTABLE[a1], a2); break;
+            case IMM: sprintf(ds, "%s #%02X",       OPTABLE[a1], a2); break;
+            case ABS: sprintf(ds, "%s #%04X",       OPTABLE[a1], a2 + a3*256); break;
+            case ABX: sprintf(ds, "%s #%04X,X",     OPTABLE[a1], a2 + a3*256); break;
+            case ABY: sprintf(ds, "%s #%04X,Y",     OPTABLE[a1], a2 + a3*256); break;
+            case ACC: sprintf(ds, "%s A",           OPTABLE[a1]); break;
+            case REL: sprintf(ds, "%s #%04X",       OPTABLE[a1], a + 2 + (char)a2); break;
+            case IND: sprintf(ds, "%s (%04X)",      OPTABLE[a1], a2 + a3*256); break;
+        }
     }
 };
