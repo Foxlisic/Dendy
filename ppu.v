@@ -43,13 +43,15 @@ module ppu
     output reg          x2w,
     // --- Управление ---
     output reg          ce_cpu,
-    output reg          ce_ppu
+    output reg          ce_ppu,
+    output              nmi
 );
 
 assign prga  = cpu_a;
 assign prgw  = cpu_w;
 assign prgd  = cpu_o;
 assign cpu_i = prgi;
+assign nmi   = 0;
 
 assign {r, g, b} =
 

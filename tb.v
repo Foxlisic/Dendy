@@ -18,7 +18,7 @@ wire [15:0] A,    prga;
 wire [ 7:0] I, D, prgd;
 wire        R, W, prgw;
 // ---------------------------------------------------------------------
-wire        ce_cpu;
+wire        ce_cpu, nmi;
 // ---------------------------------------------------------------------
 initial begin
 
@@ -26,6 +26,10 @@ initial begin
     $readmemh("ch.hex", vmm, 16'h0000);
     $readmemh("vm.hex", vmm, 16'h2000);
     $readmemh("sp.hex", oam,  8'h00);
+
+    prg[16'hFFFA] = 8'h00; prg[16'hFFFB] = 8'h00; // NMI
+    prg[16'hFFFC] = 8'h00; prg[16'hFFFD] = 8'h00; // RST
+    prg[16'hFFFE] = 8'h04; prg[16'hFFFF] = 8'h00; // BRK
 
 end
 // ---------------------------------------------------------------------
@@ -47,6 +51,7 @@ cpu DendyCPU
     .clock      (clock25),
     .reset_n    (reset_n),
     .ce         (1'b1),   // ce_cpu
+    .nmi        (nmi),
     .A          (A),
     .I          (I),
     .D          (D),
@@ -61,6 +66,7 @@ ppu DendyPPU
     .clock25    (clock25),
     .reset_n    (reset_n),
     .ce_cpu     (ce_cpu),
+    .nmi        (nmi),
     // -- Видеопамять --
     .chra       (chra),
     .chrd       (chrd),

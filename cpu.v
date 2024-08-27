@@ -8,6 +8,7 @@ module cpu
     input               clock,      // 25 Mhz
     input               reset_n,    // ResetN
     input               ce,         // ChipEnabled
+    input               nmi,        // Из PPU
     // --- Интерфейс работы с памятью ---
     output      [15:0]  A,          // Адрес
     input       [ 7:0]  I,          // Данные
@@ -37,6 +38,7 @@ localparam
 
 // Позиции флагов
 localparam CF = 0, ZF = 1, IF = 2, DF = 3, BF = 4, VF = 6, SF = 7;
+localparam IRQ_NMI = 2'b01, IRQ_RST = 2'b10, IRQ_BRK = 2'b11;
 localparam
 
     DST_A = 2'b00, DST_X = 2'b01, DST_Y = 2'b10, DST_S = 2'b11,
@@ -59,6 +61,7 @@ reg [ 7:0]  tr;             // Временный регистр
 reg [ 1:0]  intr;           // =0 =1 =2 =3 USR
 reg         cout;           // Перенос во время вычисления адресов
 reg         cnext;          // =1 Разная задержка из-за инструкции
+reg         nmitr;          // NMI сохранненый сигнал
 
 // Вычисления
 // ---------------------------------------------------------------------
@@ -136,15 +139,18 @@ always @(posedge clock)
 // Вызов процедуры BRK #1 RESET
 if (reset_n == 1'b0) begin
 
-    t   <= 0;
+    t   <= BRK;
     m   <= 0;
+    n   <= 0;
     a   <= 8'hC2;
     x   <= 8'h83;
     y   <= 8'h02;
     s   <= 8'h00;
-    //        SV     ZC
-    p   <= 8'b0000_0000;
-    pc  <= 16'h0000;
+    //            SV     ZC
+    p       <= 8'b0000_0000;
+    pc      <= 16'h0000;
+    nmitr   <= 1'b0;
+    intr    <= IRQ_RST;
 
 end
 // Процессор работает только если CE=1
@@ -158,78 +164,93 @@ else if (ce) begin
     // Загрузка опкода
     LOAD: begin
 
-        pc      <= pcn;
-        opcode  <= I;
+        nmitr <= nmi;
+
         cout    <= 0;
         cnext   <= 0;       // =1 Некоторые инструкции удлиняют такт +1
         rd      <= 1;       // =1 Используется для запроса чтения из PPU
         n       <= 0;       // ID микрокода RUN
         alu     <= I[7:5];  // АЛУ по умолчанию
-        intr    <= 2'b11;   // USER BRK
+        intr    <= IRQ_BRK; // USER BRK
         dst_r   <= DST_A;   // A
         src_r   <= SRC_D;   // DataIn
 
-        casex (I)
-        8'b001_000_00: begin t <= JSR; end
-        8'b010_000_00: begin t <= RTI; end
-        8'b011_000_00: begin t <= RTS; end
-        8'b000_000_00: begin t <= BRK; pc <= pc + 2; end
-        8'bxxx_000_x1: begin t <= NDX; end  // Indirect,X
-        8'bxxx_010_x1,
-        8'b1xx_000_x0: begin t <= RUN; end  // Immediate
-        8'bxxx_100_x1: begin t <= NDY; end  // Indirect,Y
-        8'bxxx_110_x1: begin t <= ABY; end  // Absolute,Y
-        8'bxxx_001_xx: begin t <= ZP;  end  // ZeroPage
-        8'bxxx_011_xx, // Absolute
-        8'b001_000_00: begin t <= ABS; end
-        8'b10x_101_1x: begin t <= ZPY; end  // ZeroPage,Y
-        8'bxxx_101_xx: begin t <= ZPX; end  // ZeroPage,X
-        8'b10x_111_1x: begin t <= ABY; end  // Absolute,Y
-        8'bxxx_111_xx: begin t <= ABX; end  // Absolute,X
-        8'bxxx_100_00: begin t <= REL; end  // Relative
-        8'b0xx_010_10: begin t <= RUN; end  // Accumulator
-        default:       begin t <= RUN; end
-        endcase
+        // Прерывание NMI: срабатывает на восходящем сигнале
+        if (nmitr != nmi && nmi) begin
 
-        // АЛУ
-        casex (I)
-        // CPY
-        8'hC0,
-        8'hC4,
-        8'hCC: begin alu <= CMP; dst_r <= DST_Y; end
-        // CPX
-        8'hE0,
-        8'hE4,
-        8'hEC: begin alu <= CMP; dst_r <= DST_X; end
-        // TXA, TYA
-        8'h8A: begin alu <= LDA; src_r <= SRC_X; end
-        8'h98: begin alu <= LDA; src_r <= SRC_Y; end
-        // TAX, TAY
-        8'hAA,
-        8'hA8: begin alu <= LDA; src_r <= SRC_A; end
-        // BIT
-        8'h24,
-        8'h2C: begin alu <= BIT; end
-        // DEX, INX, DEY, INY
-        8'hCA: begin alu <= DEC; src_r <= SRC_X; end
-        8'hE8: begin alu <= INC; src_r <= SRC_X; end
-        8'h88: begin alu <= DEC; src_r <= SRC_Y; end
-        8'hC8: begin alu <= INC; src_r <= SRC_Y; end
-        // Сдвиги
-        8'b0xx_xx1_10: begin alu <= ASL + I[6:5]; end
-        8'b0xx_010_10: begin alu <= ASL + I[6:5]; src_r <= SRC_A; end
-        // INC, DEC
-        8'b11x_xx1_10: begin alu <= DEC + I[5]; end
-        endcase
+            t    <= BRK;
+            intr <= IRQ_NMI;
 
-        // STX, STY, STA: Выбор источника для записи в память
-        casex (I) 8'b100_xx1_10: D <= x; 8'b100_xx1_00: D <= y; default: D <= a; endcase
+        end else
+        // Считывание опкода
+        begin
 
-        // Для STA запретить RD, но разрешить WR
-        casex (I) 8'b100_xxx_01, 8'b100_xx1_x0: rd <= 1'b0; endcase
+            pc      <= pcn;
+            opcode  <= I;
 
-        // INC, DEC, STA, Сдвиговые всегда добавляют +1Т к ABS,XY; IND,Y
-        casex (I) 8'b100xxxxx, 8'b11xxx110, 8'b0xxxx110: cnext <= 1; endcase
+            casex (I)
+            8'b001_000_00: begin t <= JSR; end
+            8'b010_000_00: begin t <= RTI; end
+            8'b011_000_00: begin t <= RTS; end
+            8'b000_000_00: begin t <= BRK; pc <= pc + 2; end
+            8'bxxx_000_x1: begin t <= NDX; end  // Indirect,X
+            8'bxxx_010_x1,
+            8'b1xx_000_x0: begin t <= RUN; end  // Immediate
+            8'bxxx_100_x1: begin t <= NDY; end  // Indirect,Y
+            8'bxxx_110_x1: begin t <= ABY; end  // Absolute,Y
+            8'bxxx_001_xx: begin t <= ZP;  end  // ZeroPage
+            8'bxxx_011_xx, // Absolute
+            8'b001_000_00: begin t <= ABS; end
+            8'b10x_101_1x: begin t <= ZPY; end  // ZeroPage,Y
+            8'bxxx_101_xx: begin t <= ZPX; end  // ZeroPage,X
+            8'b10x_111_1x: begin t <= ABY; end  // Absolute,Y
+            8'bxxx_111_xx: begin t <= ABX; end  // Absolute,X
+            8'bxxx_100_00: begin t <= REL; end  // Relative
+            8'b0xx_010_10: begin t <= RUN; end  // Accumulator
+            default:       begin t <= RUN; end
+            endcase
+
+            // АЛУ
+            casex (I)
+            // CPY
+            8'hC0,
+            8'hC4,
+            8'hCC: begin alu <= CMP; dst_r <= DST_Y; end
+            // CPX
+            8'hE0,
+            8'hE4,
+            8'hEC: begin alu <= CMP; dst_r <= DST_X; end
+            // TXA, TYA
+            8'h8A: begin alu <= LDA; src_r <= SRC_X; end
+            8'h98: begin alu <= LDA; src_r <= SRC_Y; end
+            // TAX, TAY
+            8'hAA,
+            8'hA8: begin alu <= LDA; src_r <= SRC_A; end
+            // BIT
+            8'h24,
+            8'h2C: begin alu <= BIT; end
+            // DEX, INX, DEY, INY
+            8'hCA: begin alu <= DEC; src_r <= SRC_X; end
+            8'hE8: begin alu <= INC; src_r <= SRC_X; end
+            8'h88: begin alu <= DEC; src_r <= SRC_Y; end
+            8'hC8: begin alu <= INC; src_r <= SRC_Y; end
+            // Сдвиги
+            8'b0xx_xx1_10: begin alu <= ASL + I[6:5]; end
+            8'b0xx_010_10: begin alu <= ASL + I[6:5]; src_r <= SRC_A; end
+            // INC, DEC
+            8'b11x_xx1_10: begin alu <= DEC + I[5]; end
+            endcase
+
+            // STX, STY, STA: Выбор источника для записи в память
+            casex (I) 8'b100_xx1_10: D <= x; 8'b100_xx1_00: D <= y; default: D <= a; endcase
+
+            // Для STA запретить RD, но разрешить WR
+            casex (I) 8'b100_xxx_01, 8'b100_xx1_x0: rd <= 1'b0; endcase
+
+            // INC, DEC, STA, Сдвиговые всегда добавляют +1Т к ABS,XY; IND,Y
+            casex (I) 8'b100xxxxx, 8'b11xxx110, 8'b0xxxx110: cnext <= 1; endcase
+
+        end
 
     end
 
@@ -384,7 +405,7 @@ else if (ce) begin
 
     // -------------------------------------------------------------
 
-    // 7T BRK или IRQ
+    // [7T] BRK или IRQ
     BRK: case (n)
 
         // PUSH((PC >> 8) & 0xff);
@@ -396,8 +417,7 @@ else if (ce) begin
         // LOAD ADDR
         3: begin n <= 4; cp    <= {12'hFFF, 1'b1, intr, 1'b0}; end
         4: begin n <= 5; cp[0] <= 1; tr <= I; end
-        // GOTO ADDR
-        5: begin n <= 6; pc <= {I, tr}; end
+        5: begin m <= 0; t <= LOAD;  pc <= {I, tr}; end
 
     endcase
 
@@ -407,8 +427,8 @@ else if (ce) begin
         0: begin n <= 1; tr <= I; pc <= pcn; cp[15:8] <= 8'h01; end
         1: begin n <= 2; cp[7:0] <= s; s <= s - 1; D <= pc[15:8]; W <= 1; pc[15:8] <= I; m <= 1; end
         2: begin n <= 3; cp[7:0] <= s; s <= s - 1; D <= pc[ 7:0]; W <= 1; end
-        3: begin n <= 4; pc[7:0] <= tr; end
-        4: begin m <= 0; t <= LOAD; end
+        3: begin n <= 4; pc[7:0] <= tr; m <= 0; end
+        4: begin t <= LOAD; end
 
     endcase
 
@@ -417,8 +437,8 @@ else if (ce) begin
 
         0: begin n <= 1; m <= 1;        cp[7:0] <= s + 1; s <= s + 1; cp[15:8] <= 8'h01; end
         1: begin n <= 2; pc[7:0] <= I;  cp[7:0] <= s + 1; s <= s + 1; end
-        2: begin n <= 3; pc      <= {I, pc[7:0]} + 1; end
-        3: begin n <= 4; m <= 0; end
+        2: begin n <= 3; pc      <= {I, pc[7:0]} + 1; m <= 0; end
+        3: begin n <= 4; end
         4: begin t <= LOAD; end
 
     endcase
@@ -427,9 +447,9 @@ else if (ce) begin
     RTI: case (n)
 
         0: begin n <= 1; cp[7:0]  <= s + 1; s <= s + 1; cp[15:8] <= 8'h01; m <= 1; end
-        1: begin n <= 2; cp[7:0]  <= s + 1; s <= s + 1; p <= I;   end
+        1: begin n <= 2; cp[7:0]  <= s + 1; s <= s + 1; p <= I; end
         2: begin n <= 3; cp[7:0]  <= s + 1; s <= s + 1; pc[7:0] <= I; end
-        3: begin n <= 4; pc[15:8] <= I; end
+        3: begin n <= 4; pc[15:8] <= I; m <= 0; end
         4: begin t <= LOAD; end
 
     endcase
