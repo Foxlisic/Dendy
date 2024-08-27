@@ -50,7 +50,7 @@ cpu DendyCPU
 (
     .clock      (clock25),
     .reset_n    (reset_n),
-    .ce         (1'b1),   // ce_cpu
+    .ce         (ce_cpu),
     .nmi        (nmi),
     .A          (A),
     .I          (I),

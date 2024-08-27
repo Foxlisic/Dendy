@@ -18,7 +18,7 @@ module ppu
     output              vs,
     // --- Процессор ---
     input       [15:0]  cpu_a,      // Адрес
-    output      [ 7:0]  cpu_i,      // Данные чтения
+    output reg  [ 7:0]  cpu_i,      // Данные чтения
     input       [ 7:0]  cpu_o,      // Данные записи
     input               cpu_w,      // Сигнал записи
     input               cpu_r,      // Сигнал чтения
@@ -31,11 +31,20 @@ module ppu
     // --- OAM ---
     output reg  [ 7:0]  oama,
     input       [ 7:0]  oamd,
+    output reg  [ 7:0]  oam2a,      // Операции с OAM
+    input       [ 7:0]  oam2i,
+    output reg  [ 7:0]  oam2o,
+    output reg          oam2w,
+    // --- Запись в видеопамять ---
+    output reg  [14:0]  vida,
+    input       [ 7:0]  vidi,
+    output reg  [ 7:0]  vido,
+    output reg          vidw,
     // --- PRG-ROM ---
-    output      [15:0]  prga,       // Адрес памяти RAM, PRG
+    output  reg [15:0]  prga,       // Адрес памяти RAM, PRG
     input       [ 7:0]  prgi,       // Чтение из памяти
-    output      [ 7:0]  prgd,       // Запись в память
-    output              prgw,       // Сигнал записи
+    output  reg [ 7:0]  prgd,       // Запись в память
+    output  reg         prgw,       // Сигнал записи
     // --- Удвоение сканлайна ---
     output reg  [ 7:0]  x2a,
     input       [ 7:0]  x2i,
@@ -44,14 +53,8 @@ module ppu
     // --- Управление ---
     output reg          ce_cpu,
     output reg          ce_ppu,
-    output              nmi
+    output reg          nmi
 );
-
-assign prga  = cpu_a;
-assign prgw  = cpu_w;
-assign prgd  = cpu_o;
-assign cpu_i = prgi;
-assign nmi   = 0;
 
 assign {r, g, b} =
 
@@ -97,6 +100,9 @@ wire    paper   = px >= 32 && px < (32 + 256) && py >= 16 && py < 256;
 reg  [ 9:0] x = 0;
 reg  [ 9:0] y = 0;
 reg  [14:0] v = 0, t = 0;
+reg  [14:0] va;
+reg  [ 7:0] vidch;
+reg         w = 0;
 reg  [ 1:0] ct_cpu = 0;
 reg  [ 2:0] finex = 0, _finex = 0;
 reg  [ 7:0] ctrl0;              // $2000
@@ -166,19 +172,23 @@ wire
     sp6_u = (!sp[6][21] || {sp[6][21], pipe_5[1:0]} == 3'b100),
     sp7_u = (!sp[7][21] || {sp[7][21], pipe_6[1:0]} == 3'b100);
 
-// -- Слой 0: Задний план
-wire [1:0]  back_a = {bgtile[{1'b1, ~finex}], bgtile[{1'b0, ~finex}]};
-wire [4:0]  back_b = back_a ? {bgattr[1:0], back_a} : 5'b0;
+// Видимость фона или спрайтов
+wire showbg = ctrl1[3] && (ctrl1[1] || ctrl1[1] == 0 && rx >= 8);
+wire showsp = ctrl1[4] && (ctrl1[2] || ctrl1[2] == 0 && rx >= 8);
 
-// -- Слой 1: Спрайты
-wire [4:0]  pipe_0 = (oam_id >= 1 && sp0_b && sp0_u && sp0_i[1:0]) ? sp0_i : back_b;
-wire [4:0]  pipe_1 = (oam_id >= 2 && sp1_b && sp1_u && sp1_i[1:0]) ? sp1_i : pipe_0;
-wire [4:0]  pipe_2 = (oam_id >= 3 && sp2_b && sp2_u && sp2_i[1:0]) ? sp2_i : pipe_1;
-wire [4:0]  pipe_3 = (oam_id >= 4 && sp3_b && sp3_u && sp3_i[1:0]) ? sp3_i : pipe_2;
-wire [4:0]  pipe_4 = (oam_id >= 5 && sp4_b && sp4_u && sp4_i[1:0]) ? sp4_i : pipe_3;
-wire [4:0]  pipe_5 = (oam_id >= 6 && sp5_b && sp5_u && sp5_i[1:0]) ? sp5_i : pipe_4;
-wire [4:0]  pipe_6 = (oam_id >= 7 && sp6_b && sp6_u && sp6_i[1:0]) ? sp6_i : pipe_5;
-wire [4:0]  pipe_7 = (oam_id >= 8 && sp7_b && sp7_u && sp7_i[1:0]) ? sp7_i : pipe_6;
+// -- Слой 0: Задний план :: ctrl1[3] =1 Фон отображается
+wire [1:0]  back_a = {bgtile[{1'b1, ~finex}], bgtile[{1'b0, ~finex}]};
+wire [4:0]  back_b = back_a && showbg ? {bgattr[1:0], back_a} : 5'b0;
+
+// -- Слой 1: Спрайты :: ctrl1[4] =1 Спрайты отображаются
+wire [4:0]  pipe_0 = (showsp && oam_id >= 1 && sp0_b && sp0_u && sp0_i[1:0]) ? sp0_i : back_b;
+wire [4:0]  pipe_1 = (showsp && oam_id >= 2 && sp1_b && sp1_u && sp1_i[1:0]) ? sp1_i : pipe_0;
+wire [4:0]  pipe_2 = (showsp && oam_id >= 3 && sp2_b && sp2_u && sp2_i[1:0]) ? sp2_i : pipe_1;
+wire [4:0]  pipe_3 = (showsp && oam_id >= 4 && sp3_b && sp3_u && sp3_i[1:0]) ? sp3_i : pipe_2;
+wire [4:0]  pipe_4 = (showsp && oam_id >= 5 && sp4_b && sp4_u && sp4_i[1:0]) ? sp4_i : pipe_3;
+wire [4:0]  pipe_5 = (showsp && oam_id >= 6 && sp5_b && sp5_u && sp5_i[1:0]) ? sp5_i : pipe_4;
+wire [4:0]  pipe_6 = (showsp && oam_id >= 7 && sp6_b && sp6_u && sp6_i[1:0]) ? sp6_i : pipe_5;
+wire [4:0]  pipe_7 = (showsp && oam_id >= 8 && sp7_b && sp7_u && sp7_i[1:0]) ? sp7_i : pipe_6;
 
 //-- Слой 2: Итоговый цвет
 wire [5:0]  dst    = pipe_7[4] ? sppal[pipe_7[3:0]] : bgpal[pipe_7[3:0]];
@@ -194,6 +204,7 @@ begin
     y           <= 1;       // 0|1
     px          <= 0;
     py          <= 16;       // 0|16
+    nmi         <= 0;
     finex       <= 0;
     ce_cpu      <= 0;
     ce_ppu      <= 0;
@@ -204,12 +215,14 @@ begin
     oam_id      <= 0;
 
     //               FnY VH CoarY CoarX
-    v       <= 16'b0_000_00_00000_00000;
-    t       <= 16'b0_000_00_00000_00000;
+    v           <= 16'b0_000_00_00000_00000;
+    t           <= 16'b0_000_00_00000_00000;
+    w           <= 0;
+    va          <= 0;
 
     //               4
     ctrl0   <= 8'b0001_0000;
-    ctrl1   <= 8'b0000_0000;
+    ctrl1   <= 8'b0001_1110;
 
     // Палитра фона
     bgpal[ 0] <= 6'h0F; bgpal[ 1] <= 6'h16; bgpal[ 2] <= 6'h30; bgpal[ 3] <= 6'h38;
@@ -228,9 +241,12 @@ else
 begin
 
     // Разрешение такта для CPU
-    ce_cpu <= 0;
-    ce_ppu <= 0;
-    x2w    <= 0;
+    ce_cpu  <= 0;
+    ce_ppu  <= 0;
+    x2w     <= 0;
+    prgw    <= 0;
+    vidw    <= 0;
+    oam2w   <= 0;
 
     // Кадровая развертка
     x <= xmax ?         0 : x + 1;
@@ -442,6 +458,9 @@ begin
 
             end
 
+            // Генерация обратного синхроимпульса
+            if (px == 0 && py == 256) begin nmi <= ctrl0[7]; end
+
             // Кадр начинается с позиции PY=15, так как 33 пикселя сверху идут для VGA как VBlank
             // Вернуть вертикальным счетчикам  значение из `t` для рисования нового кадра [vert]
             if (px == 32+256+8 && py == 15) begin
@@ -449,6 +468,7 @@ begin
                 {v[14:12], v[11], v[9:5]} <= {t[14:12], t[11], t[9:5]};
 
                 oam_hit <= 0;
+                nmi     <= 0;
 
             end
 
@@ -465,6 +485,135 @@ begin
                 x2w <= 1;
 
             end
+
+            // Обработка данных с CPU
+            // ---------------------------------------------------------
+
+            case (ct_cpu)
+
+                // Запрос
+                1: begin
+
+                    prga <= cpu_a;
+                    prgd <= cpu_o;
+
+                    casex (cpu_a)
+                    // $3F00-$3F1F Палитры
+                    16'b0011_1111_0000_xxxx: bgpal[cpu_a[3:0]] <= cpu_o;
+                    16'b0011_1111_0001_xxxx: sppal[cpu_a[3:0]] <= cpu_o;
+                    // $0000-1FFF Запись в память :: 000-7FF, остальное зеркала
+                    16'b000x_xxxx_xxxx_xxxx: begin prga <= cpu_a[10:0]; prgw <= cpu_w; end
+                    // Регистры видео
+                    16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
+
+                        // Управление видеопроцессором
+                        0: if (cpu_w) begin ctrl0 <= cpu_o; t[11:10] <= cpu_o[1:0]; end
+                        1: if (cpu_w) begin ctrl1 <= cpu_o; end
+
+                        // Состояние видеопроцессора
+                        2: if (cpu_r) begin
+
+                            cpu_i   <= {nmi, oam_hit, oam_id[3], (px < 32 || px >= 32+256), 4'b0000};
+                            oam_hit <= 0;
+                            w       <= 0;
+
+                        end
+
+                        // Операции с памятью спрайтов
+                        3: if (cpu_w) begin oam2a <= cpu_a[7:0]; end
+                        4: if (cpu_w) begin oam2o <= cpu_o; oam2w <= 1; end
+
+                        // Скроллинг
+                        5: if (cpu_w) begin
+
+                            if (w == 0) begin
+
+                                finex    <= cpu_o[2:0]; // FineX
+                                t[4:0]   <= cpu_o[7:3]; // CoarseX
+
+                            end else begin
+
+                                t[14:12] <= cpu_o[2:0]; // FineY
+                                t[  9:5] <= cpu_o[7:3]; // CoarseY
+
+                            end
+
+                            w <= ~w;
+
+                        end
+
+                        // Адрес памяти
+                        6: if (cpu_w) begin
+
+                            if (w == 0) begin
+
+                                va[15:0] <= cpu_o;
+                                t[13:8]  <= cpu_o[5:0];
+                                t[14]    <= 1'b0;
+
+                            end else begin
+
+                                va[7:0] <= cpu_o;
+                                t[7:0]  <= cpu_o;
+
+                            end
+
+                            w <= ~w;
+
+                        end
+
+                        // Запись или чтение из видеопамяти
+                        7: begin
+
+                            if (cpu_w) begin
+
+                                vida <= va;
+                                vido <= cpu_o;
+                                vidw <= 1;
+
+                            end else if (cpu_r) begin
+
+                                vida  <= va;
+                                cpu_i <= vidch;
+
+                            end
+
+                            va <= va + (ctrl0[2] ? 32 : 1);
+
+                        end
+
+                    endcase
+                    endcase
+
+                end
+
+                // Ответ
+                2: begin
+
+                    casex (cpu_a)
+                    // Палитры
+                    16'b0011_1111_0000_xxxx: cpu_i <= bgpal[cpu_a[3:0]];
+                    16'b0011_1111_0001_xxxx: cpu_i <= sppal[cpu_a[3:0]];
+                    16'b0011_1111_xxxx_xxxx: cpu_i <= 8'h00;
+                    // Оперативная [0000-1FFF] :: программная память [8000-FFFF]
+                    16'b000x_xxxx_xxxx_xxxx,
+                    16'b1xxx_xxxx_xxxx_xxxx: cpu_i <= prgi;
+                    // Регистры видеопроцессора
+                    16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
+
+                        // Запись или чтение OAM
+                        4: if (cpu_w) begin oam2a <= oam2a + 1; end
+                                 else begin oam2a <= oam2a + 1; cpu_i <= oam2i; end
+
+                        // Чтение из памяти байта
+                        7: begin vidch <= vidi; end
+
+                    endcase
+                    endcase
+
+                end
+
+            endcase
 
         end
 
