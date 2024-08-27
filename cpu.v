@@ -9,6 +9,7 @@ module cpu
     input               reset_n,    // ResetN
     input               ce,         // ChipEnabled
     input               nmi,        // Из PPU
+    output              m0,         // Такт #0
     // --- Интерфейс работы с памятью ---
     output      [15:0]  A,          // Адрес
     input       [ 7:0]  I,          // Данные
@@ -17,7 +18,8 @@ module cpu
     output reg          W           // Запись
 );
 
-assign A = m ? cp : pc;
+assign A  = m ? cp : pc;
+assign m0 = (t == LOAD);
 
 // Объявления
 // ---------------------------------------------------------------------
@@ -278,7 +280,7 @@ else if (ce) begin
 
         if (opcode == 8'h4C) // 3T JMP ABS
              begin t <= LOAD; pc <= itr; end
-        else begin t <= RUN;  cp <= itr; m <= 1; {R,W} <= {rd,~rd}; end
+        else begin t <= RUN;  cp <= itr; pc <= pcn; m <= 1; {R,W} <= {rd,~rd}; end
 
     end
 

@@ -26,7 +26,7 @@ module ppu
     output reg  [8:0]   px,         // PPU.x = 0..340
     output reg  [8:0]   py,         // PPU.y = 0..261
     // --- Видеопамять ---
-    output reg  [13:0]  chra,       // Адрес в видеопамяти
+    output reg  [14:0]  chra,       // Адрес в видеопамяти
     input       [ 7:0]  chrd,       // Данные из видеопамяти
     // --- OAM ---
     output reg  [ 7:0]  oama,
@@ -103,6 +103,7 @@ reg  [14:0] v = 0, t = 0;
 reg  [14:0] va;
 reg  [ 7:0] vidch;
 reg         w = 0;
+reg         dma = 0;
 reg  [ 1:0] ct_cpu = 0;
 reg  [ 2:0] finex = 0, _finex = 0;
 reg  [ 7:0] ctrl0;              // $2000
@@ -209,10 +210,13 @@ begin
     ce_cpu      <= 0;
     ce_ppu      <= 0;
     ct_cpu      <= 0;
+    vidch       <= 8'hFF;
 
+    dma         <= 0;
     oama        <= 0;
     oam_st      <= 0;
     oam_id      <= 0;
+    oam_hit     <= 0;
 
     //               FnY VH CoarY CoarX
     v           <= 16'b0_000_00_00000_00000;
@@ -491,8 +495,17 @@ begin
 
             case (ct_cpu)
 
+                // На время работы DMA отключить CPU от памяти
+                0: if (dma) ce_cpu <= 0;
+
                 // Запрос
-                1: begin
+                1: if (dma) begin
+
+                    oam2o <= prgi;      // Читать значение из [PRGA]
+                    oam2w <= 1;         // Писать в OAM2A
+
+                end
+                else begin
 
                     prga <= cpu_a;
                     prgd <= cpu_o;
@@ -501,8 +514,8 @@ begin
                     // $3F00-$3F1F Палитры
                     16'b0011_1111_0000_xxxx: bgpal[cpu_a[3:0]] <= cpu_o;
                     16'b0011_1111_0001_xxxx: sppal[cpu_a[3:0]] <= cpu_o;
-                    // $0000-1FFF Запись в память :: 000-7FF, остальное зеркала
-                    16'b000x_xxxx_xxxx_xxxx: begin prga <= cpu_a[10:0]; prgw <= cpu_w; end
+                    // 4014 DMA
+                    16'b0100_0000_0001_0100: begin prga <= {cpu_o, 8'h00}; oam2a <= 0; end
                     // Регистры видео
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
 
@@ -513,7 +526,7 @@ begin
                         // Состояние видеопроцессора
                         2: if (cpu_r) begin
 
-                            cpu_i   <= {nmi, oam_hit, oam_id[3], (px < 32 || px >= 32+256), 4'b0000};
+                            cpu_i   <= {nmi, oam_hit, oam_id[3], (px < 32 || px >= 32+256) || py < 16 || py >= 256, 4'b0000};
                             oam_hit <= 0;
                             w       <= 0;
 
@@ -547,7 +560,7 @@ begin
 
                             if (w == 0) begin
 
-                                va[15:0] <= cpu_o;
+                                va[15:8] <= cpu_o;
                                 t[13:8]  <= cpu_o[5:0];
                                 t[14]    <= 1'b0;
 
@@ -583,21 +596,33 @@ begin
                         end
 
                     endcase
+                    // Запись в память
+                    default: begin prgw <= cpu_w; end
                     endcase
 
                 end
 
                 // Ответ
-                2: begin
+                2: if (dma) begin
+
+                    oam2a     <= oam2a + 1;
+                    prga[7:0] <= prga[7:0] + 1;
+
+                    // Выключить запись DMA
+                    if (oam2a == 8'hFF) dma <= 0;
+
+                end else begin
 
                     casex (cpu_a)
+
                     // Палитры
                     16'b0011_1111_0000_xxxx: cpu_i <= bgpal[cpu_a[3:0]];
                     16'b0011_1111_0001_xxxx: cpu_i <= sppal[cpu_a[3:0]];
                     16'b0011_1111_xxxx_xxxx: cpu_i <= 8'h00;
-                    // Оперативная [0000-1FFF] :: программная память [8000-FFFF]
-                    16'b000x_xxxx_xxxx_xxxx,
-                    16'b1xxx_xxxx_xxxx_xxxx: cpu_i <= prgi;
+
+                    // $4014 DMA: Активация записи в OAM из MEMORY
+                    16'b0100_0000_0001_0100: begin dma <= 1; end
+
                     // Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
 
@@ -606,9 +631,12 @@ begin
                                  else begin oam2a <= oam2a + 1; cpu_i <= oam2i; end
 
                         // Чтение из памяти байта
-                        7: begin vidch <= vidi; end
+                        7: if (cpu_r) begin vidch <= vidi; end
 
                     endcase
+
+                    // Оперативная или программная память
+                    default: cpu_i <= prgi;
                     endcase
 
                 end

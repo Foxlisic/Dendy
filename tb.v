@@ -11,12 +11,12 @@ initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 reg  [ 7:0] prg[65536];
 reg  [ 7:0] vmm[65536];
 reg  [ 7:0] oam[256];
-wire [13:0] chra;
-wire [ 7:0] oama;
-reg  [ 7:0] chrd, prgi, oamd;
+wire [14:0] chra, vida;
+wire [ 7:0] oama, oam2a, vido;
+reg  [ 7:0] chrd, prgi, oamd, oam2i, vidi;
 wire [15:0] A,    prga;
-wire [ 7:0] I, D, prgd;
-wire        R, W, prgw;
+wire [ 7:0] I, D, prgd, oam2o;
+wire        R, W, prgw, oam2w;
 // ---------------------------------------------------------------------
 wire        ce_cpu, nmi;
 // ---------------------------------------------------------------------
@@ -36,11 +36,15 @@ end
 always @(posedge clock)
 begin
 
-    prgi <= prg[prga];
-    chrd <= vmm[chra];
-    oamd <= oam[oama];
+    prgi  <= prg[prga];
+    chrd  <= vmm[chra];
+    oamd  <= oam[oama];
+    oam2i <= oam[oam2a];
+    vidi  <= vmm[vida];
 
-    if (prgw) prg[prga] <= prgd;
+    if (prgw)  prg[prga] <= prgd;
+    if (oam2w) oam[oam2a] <= oam2o;
+    if (vidw)  vmm[vida] <= vido;
 
 end
 
@@ -70,8 +74,18 @@ ppu DendyPPU
     // -- Видеопамять --
     .chra       (chra),
     .chrd       (chrd),
+    // ---
     .oama       (oama),
     .oamd       (oamd),
+    .oam2a      (oam2a),
+    .oam2i      (oam2i),
+    .oam2o      (oam2o),
+    .oam2w      (oam2w),
+    // ---
+    .vida       (vida),
+    .vidi       (vidi),
+    .vido       (vido),
+    .vidw       (vidw),
     // -- Память PRG --
     .prga       (prga),
     .prgi       (prgi),
