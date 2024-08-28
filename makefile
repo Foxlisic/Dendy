@@ -1,6 +1,6 @@
 VLIB=/usr/share/verilator/include
 
-all: ica cre app
+all: ica cre
 ica:
 	iverilog -g2005-sv -DICARUS=1 -o tb.qqq tb.v cpu.v ppu.v
 	vvp tb.qqq >> /dev/null

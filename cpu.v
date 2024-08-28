@@ -138,13 +138,13 @@ wire [7:0] ap =
     alu[3:1] == 3'b000_ || // ORA, AND
     alu[3:0] == 4'b0010 || // EOR
     alu[3:1] == 3'b010_ || // STA, LDA
-    alu[3:1] == 4'b111_ ? {sf,       p[6:2], zf,    cin} : // INC, DEC
+    alu[3:1] == 4'b111_ ? {sf,       p[6:2], zf,   p[0]} : // INC, DEC
     alu[3:0] == 4'b0011 ? {sf, oadc, p[5:2], zf,  carry} : // ADC
     alu[3:0] == 4'b0111 ? {sf, osbc, p[5:2], zf, ~carry} : // SBC
     alu[3:0] == 4'b0110 ? {sf,       p[6:2], zf, ~carry} : // CMP
     alu[3:1] == 3'b100_ ? {sf,       p[6:2], zf, src[7]} : // ASL, ROL
     alu[3:1] == 3'b101_ ? {sf,       p[6:2], zf, src[0]} : // LSR, ROR
-    alu[3:0] == 4'b1100 ? {src[7:6], p[5:2], zf,    cin} : 8'hFF; // BIT
+    alu[3:0] == 4'b1100 ? {src[7:6], p[5:2], zf,   p[0]} : 8'hFF; // BIT
 
 // Исполнение опкодов
 // ---------------------------------------------------------------------
@@ -158,10 +158,10 @@ if (reset_n == 1'b0) begin
     n   <= 0;
     a   <= 8'hC2;
     x   <= 8'h83;
-    y   <= 8'h02;
+    y   <= 8'h81;
     s   <= 8'h00;
     //            SV     ZC
-    p       <= 8'b0000_0000;
+    p       <= 8'b0101_1000;
     pc      <= 16'h0000;
     nmitr   <= 1'b0;
     intr    <= IRQ_RST;
@@ -335,7 +335,7 @@ else if (ce) begin
 
         // LDX, LDY, TAX, TAY, DEX, DEY, INX, INY
         8'b101_xx1_10, 8'hA2, 8'hAA, 8'hCA, 8'hE8: begin x <= ar[7:0]; p <= ap; end
-        8'b101_xx0_10, 8'hA0, 8'hA8, 8'h88, 8'hC8: begin y <= ar[7:0]; p <= ap; end
+        8'b101_xx1_00, 8'hA0, 8'hA8, 8'h88, 8'hC8: begin y <= ar[7:0]; p <= ap; end
 
         // CP[XY] D :: BIT
         8'hC0,8'hC4,8'hC8,
@@ -368,7 +368,7 @@ else if (ce) begin
         // JMP [INDIRECT]
         8'h6C: case (n)
 
-            0: begin n <= 1; m <= 1; t <= RUN; tr <= I; cp[7:0] <= cp[7:0] + 1; end
+            0: begin n <= 1; m <= 1; t <= RUN; tr <= I; cp[7:0] <= cp[7:0] + 1; R <= 1; end
             1: begin pc <= {I, tr}; end
 
         endcase
@@ -406,7 +406,7 @@ else if (ce) begin
                 n <= 2;
                 t <= RUN;
 
-                if (opcode[5]) begin a <= I; p[ZF] <= I == 0; p[SF] <= I[7]; end
+                if (opcode[6]) begin a <= I; p[ZF] <= I == 0; p[SF] <= I[7]; end
                 else           begin p <= I; end
 
             end
@@ -426,7 +426,7 @@ else if (ce) begin
         // PUSH(PC & 0xff); SET_BREAK(1);
         // PUSH(SR); SET_INTERRUPT(1);
         0: begin n <= 1; cp <= {8'h01, s}; W <= 1; s <= s - 1; D <= pc[15:8]; m     <= 1; end
-        1: begin n <= 2; cp[7:0] <= s;     W <= 1; s <= s - 1; D <= pc[7:0];  p[BF] <= 1; end
+        1: begin n <= 2; cp[7:0] <= s;     W <= 1; s <= s - 1; D <= pc[7:0];  p[BF] <= 1; p[5] <= 1; end
         2: begin n <= 3; cp[7:0] <= s;     W <= 1; s <= s - 1; D <= p;        p[IF] <= 1; end
         // LOAD ADDR
         3: begin n <= 4; cp    <= {12'hFFF, 1'b1, intr, 1'b0}; end

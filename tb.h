@@ -1,5 +1,7 @@
 #include <SDL2/SDL.h>
 
+#define DEBUG 0
+
 enum OpTypes {
     ___ = 0,
     IMP = 1, NDX =  2, NDY =  3, ZP  =  4, ZPX =  5, ZPY =  6, IMM =  7,
@@ -323,8 +325,7 @@ public:
         cpu->nmi = ppu->nmi;
 
         // Состояние ДО выполнения такта CPU
-
-        if (cpu->ce) {
+        if (DEBUG && cpu->ce) {
 
             disam(cpu->A);
             printf("%c%04X R-%02X %s%02X A-%02X X-%02X Y-%02X P-%02X [%04X %c] %s\n",
@@ -342,11 +343,8 @@ public:
             );
         }
 
-        if (1 || cpu->A != 0xC2EF) {
-
-            cpu->clock = 0; cpu->eval();
-            cpu->clock = 1; cpu->eval();
-        }
+        cpu->clock = 0; cpu->eval();
+        cpu->clock = 1; cpu->eval();
 
         vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
     }
