@@ -3,7 +3,7 @@
 /* verilator lint_off CASEX */
 /* verilator lint_off CASEOVERLAP */
 
-`define NMI_ENABLE 0
+`define NMI_ENABLE 1
 
 /**
  * Формирование видеосигнала на VGA 800 x 525
@@ -26,6 +26,9 @@ module ppu
     input       [ 7:0]  cpu_o,      // Данные записи
     input               cpu_w,      // Сигнал записи
     input               cpu_r,      // Сигнал чтения
+    // --- Джойстики ---
+    input       [7:0]   joy1,
+    input       [7:0]   joy2,
     // --- Счетчики ---
     output reg  [8:0]   px,         // PPU.x = 0..340
     output reg  [8:0]   py,         // PPU.y = 0..261
@@ -118,6 +121,9 @@ reg  [ 1:0] bgattr;             // Номер палитры для фона (0.
 reg  [ 5:0] cl = 6'h00;
 reg  [ 5:0] bgpal[16];          // Палитра фона
 reg  [ 5:0] sppal[16];          // Палитра спрайтов
+// ---------------------------------------------------------------------
+reg         joy1_ff;            // Защелка джойстика
+reg  [23:0] joy1_in, joy2_in;
 // ---------------------------------------------------------------------
 reg  [31:0] sp[8];
 reg  [ 7:0] oam_y;              // Временное Y
@@ -217,6 +223,9 @@ begin
     ct_cpu      <= 0;
     vidch       <= 8'hFF;
     vsync       <= 0;
+
+    joy1_ff     <= 0;
+    joy1_in     <= 0;
 
     dma         <= 0;
     oama        <= 0;
@@ -397,8 +406,9 @@ begin
         begin
 
             // 3Т PPU = 1T CPU
+            // На время работы DMA отключить CPU от памяти
             ct_cpu <= (ct_cpu == 2) ? 0 : ct_cpu + 1;
-            ce_cpu <= (ct_cpu == 0);
+            ce_cpu <= (ct_cpu == 0) && (dma == 0);
             ce_ppu <= 1;
 
             // Формирование фоновой картинки
@@ -502,9 +512,6 @@ begin
 
             case (ct_cpu)
 
-                // На время работы DMA отключить CPU от памяти
-                0: if (dma) ce_cpu <= 0;
-
                 // Запрос
                 1: if (dma) begin
 
@@ -518,11 +525,20 @@ begin
                     prgd <= cpu_o;
 
                     casex (cpu_a)
+
                     // 4014 DMA
                     16'b0100_0000_0001_0100: if (cpu_w) begin prga <= {cpu_o, 8'h00}; oam2a <= 0; end
 
-                    // 4016 JOYSTICK, запрос данных
-                    16'b0100_0000_0001_0110: if (cpu_w) begin end
+                    // 4016 JOYSTICK, запись данных
+                    16'b0100_0000_0001_0110: if (cpu_w) begin
+
+                        // При записи в $4016 в младший бит сначала 1, потом 0, защелкнуть кнопки
+                        if ({joy1_ff, cpu_o[0]} == 2'b10) joy1_in <= {16'h0800, joy1};
+                        if ({joy1_ff, cpu_o[0]} == 2'b10) joy2_in <= {16'h0800, joy2};
+
+                        joy1_ff <= cpu_o[0];
+
+                    end
 
                     // Регистры видео
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
@@ -615,6 +631,7 @@ begin
                         end
 
                     endcase
+
                     // Запись в память
                     default: begin prgw <= cpu_w; end
                     endcase
@@ -637,8 +654,13 @@ begin
                     // $4014 DMA: Активация записи в OAM из MEMORY
                     16'b0100_0000_0001_0100: if (cpu_w) begin dma <= 1; end
 
-                    // 4016 JOYSTICK
-                    16'b0100_0000_0001_0110: if (cpu_r) begin cpu_i <= 8'hFF; end
+                    // 4016 JOYSTICK. Чтение данных
+                    16'b0100_0000_0001_0110: if (cpu_r) begin
+
+                        cpu_i   <= {7'b0100_000, joy1_in[0]};
+                        joy1_in <= joy1_in >> 1;
+
+                    end
 
                     // Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])

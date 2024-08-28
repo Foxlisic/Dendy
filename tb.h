@@ -73,6 +73,7 @@ protected:
     uint8_t     ram[2048];
     uint8_t     oam[256];
     uint8_t     x2line[256];
+    uint8_t     joy1 = 0, joy2 = 0;
 
     char        ds[256];
 
@@ -206,7 +207,18 @@ public:
                 switch (evt.type) {
 
                     case SDL_QUIT:
+
                         return 0;
+
+                    case SDL_KEYDOWN:
+
+                        kbd_scancode(evt.key.keysym.scancode, 1);
+                        break;
+
+                    case SDL_KEYUP:
+
+                        kbd_scancode(evt.key.keysym.scancode, 0);
+                        break;
                 }
             }
 
@@ -226,6 +238,21 @@ public:
             }
 
             SDL_Delay(1);
+        }
+    }
+
+    void kbd_scancode(int scan, int press)
+    {
+        switch (scan) {
+
+            case SDL_SCANCODE_Z:        joy1 = (joy1 & 0b11111110) | (press ? 1    : 0); break;
+            case SDL_SCANCODE_X:        joy1 = (joy1 & 0b11111101) | (press ? 2    : 0); break;
+            case SDL_SCANCODE_C:        joy1 = (joy1 & 0b11111011) | (press ? 4    : 0); break;
+            case SDL_SCANCODE_V:        joy1 = (joy1 & 0b11110111) | (press ? 8    : 0); break;
+            case SDL_SCANCODE_UP:       joy1 = (joy1 & 0b11101111) | (press ? 16   : 0); break;
+            case SDL_SCANCODE_DOWN:     joy1 = (joy1 & 0b11011111) | (press ? 32   : 0); break;
+            case SDL_SCANCODE_LEFT:     joy1 = (joy1 & 0b10111111) | (press ? 64   : 0); break;
+            case SDL_SCANCODE_RIGHT:    joy1 = (joy1 & 0b01111111) | (press ? 128  : 0); break;
         }
     }
 
@@ -286,6 +313,7 @@ public:
         // Запись в OAM
         if (ppu->oam2w) { oam[ppu->oam2a] = ppu->oam2o; }
 
+        // Запись в видеопамять
         if (ppu->vida >= 0x2000 && ppu->vida < 0x3000 && ppu->vidw) {
             videom[0x2000 + (ppu->vida & 0x1FFF)] = ppu->vido;
         }
@@ -309,6 +337,10 @@ public:
         ppu->cpu_w = cpu->W;
         ppu->cpu_r = cpu->R;
 
+        // Джойстики
+        ppu->joy1 = joy1;
+        ppu->joy2 = joy2;
+
         // Читаться для PPU, не CPU.
         ppu->prgi = read(ppu->prga);
 
@@ -323,6 +355,11 @@ public:
         cpu->I   = ppu->cpu_i;
         cpu->ce  = ppu->ce_cpu;
         cpu->nmi = ppu->nmi;
+
+        // Отладка джойстика
+        if (DEBUG && cpu->A == 0x4016 && (cpu->R || cpu->W)) {
+            printf("%c %02X %02X\n", cpu->W ? 'w' : ' ', cpu->D, cpu->I);
+        }
 
         // Состояние ДО выполнения такта CPU
         if (DEBUG && cpu->ce) {
