@@ -246,6 +246,8 @@ else if (ce) begin
             8'hE8: begin alu <= INC; src_r <= SRC_X; end
             8'h88: begin alu <= DEC; src_r <= SRC_Y; end
             8'hC8: begin alu <= INC; src_r <= SRC_Y; end
+            // AAC, ASR, ARR
+            8'h0B, 8'h2B, 8'h4B, 8'h6B: begin alu <= AND; end
             // Сдвиги
             8'b0xx_xx1_10: begin alu <= ASL + I[6:5]; end
             8'b0xx_010_10: begin alu <= ASL + I[6:5]; src_r <= SRC_A; end
@@ -353,8 +355,22 @@ else if (ce) begin
 
         // АЛУ [dst,D]; Сдвиги ACC; TRANSFER
         8'bxxx_xxx_01: begin p <= ap; if (alu != CMP) a <= ar[7:0]; end
+
+        // СДВИГ IMM, TXA, TYA, SBC
         8'b0xx_010_10,
-        8'h8A, 8'h98: begin a <= ar[7:0]; p <= ap; end
+        8'h8A, 8'h98, 8'hEB: begin a <= ar[7:0]; p <= ap; end
+
+        // Недокументированные инструкции
+        // -----------------------
+        // AAC: AND + Carry
+        8'h0B, 8'h2B: begin a <= ar[7:0]; p <= ap; p[CF] <= ar[7]; end
+
+        // ASR: AND + LSR
+        8'h4B: begin a <= ar[7:1]; {p[CF], p[SF], p[ZF]} <= {ar[0], 1'b0, ar[7:1] == 0}; end
+
+        // ARR: AND + ROR
+        8'h6B: begin a <= {p[CF], ar[7:1]}; {p[VF], p[CF], p[ZF]} <= {ar[6] ^ ar[7], ar[7], {p[CF], ar[7:1]} == 0}; end
+        // -----------------------
 
         // Сдвиги, INC, DEC: Запись в память
         8'b0xx_xx1_10,
