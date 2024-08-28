@@ -200,6 +200,7 @@ public:
         for (;;) {
 
             Uint32 ticks = SDL_GetTicks();
+            Uint32 count = 0;
 
             // Прием событий
             while (SDL_PollEvent(& evt)) {
@@ -223,22 +224,27 @@ public:
                 }
             }
 
-            // Обновление экрана
-            if (ticks - pticks >= frame_length) {
+            do {
 
-                frame();
+                for (int i = 0; i < 4096; i++) {
 
-                pticks = ticks;
-                SDL_UpdateTexture       (sdl_screen_texture, NULL, screen_buffer, width * sizeof(Uint32));
-                SDL_SetRenderDrawColor  (sdl_renderer, 0, 0, 0, 0);
-                SDL_RenderClear         (sdl_renderer);
-                SDL_RenderCopy          (sdl_renderer, sdl_screen_texture, NULL, & dstRect);
-                SDL_RenderPresent       (sdl_renderer);
+                    tick();
+                    count++;
+                }
 
-                return 1;
-            }
+                pticks = SDL_GetTicks();
+
+            } while (pticks - ticks < frame_length);
+
+            SDL_UpdateTexture       (sdl_screen_texture, NULL, screen_buffer, width * sizeof(Uint32));
+            SDL_SetRenderDrawColor  (sdl_renderer, 0, 0, 0, 0);
+            SDL_RenderClear         (sdl_renderer);
+            SDL_RenderCopy          (sdl_renderer, sdl_screen_texture, NULL, & dstRect);
+            SDL_RenderPresent       (sdl_renderer);
 
             SDL_Delay(1);
+
+            return 1;
         }
     }
 
@@ -246,8 +252,8 @@ public:
     {
         switch (scan) {
 
-            case SDL_SCANCODE_Z:        joy1 = (joy1 & 0b11111110) | (press ? 1    : 0); break;
-            case SDL_SCANCODE_X:        joy1 = (joy1 & 0b11111101) | (press ? 2    : 0); break;
+            case SDL_SCANCODE_X:        joy1 = (joy1 & 0b11111110) | (press ? 1    : 0); break;
+            case SDL_SCANCODE_Z:        joy1 = (joy1 & 0b11111101) | (press ? 2    : 0); break;
             case SDL_SCANCODE_C:        joy1 = (joy1 & 0b11111011) | (press ? 4    : 0); break;
             case SDL_SCANCODE_V:        joy1 = (joy1 & 0b11110111) | (press ? 8    : 0); break;
             case SDL_SCANCODE_UP:       joy1 = (joy1 & 0b11101111) | (press ? 16   : 0); break;

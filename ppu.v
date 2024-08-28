@@ -138,7 +138,7 @@ wire [ 4:0] coarse_x    = v[4:0],
 wire [ 2:0] fine_y      = v[14:12];
 wire [ 7:0] rx          = px - (32 - 1),        // -1 Из-за защелки REG на X
             ry          = py - (16 + 1);        // +1 Из-за пропуска линии
-wire [ 3:0] sp_height   = (ctrl0[5] ? 16 : 8);
+wire [ 4:0] sp_height   = (ctrl0[5] ? 16 : 8);
 wire [ 7:0] sp_chrd     = sp_invx ? {chrd[0],chrd[1],chrd[2],chrd[3],chrd[4],chrd[5],chrd[6],chrd[7]} : chrd;
 
 // Вычисление цвета
