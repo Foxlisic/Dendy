@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 
-#define DEBUG 0
+#define DEBUG1 0
+#define DEBUG2 0
 
 enum OpTypes {
     ___ = 0,
@@ -357,12 +358,12 @@ public:
         cpu->nmi = ppu->nmi;
 
         // Отладка джойстика
-        if (DEBUG && cpu->A == 0x4016 && (cpu->R || cpu->W)) {
+        if (DEBUG2 && cpu->A == 0x4014 && (cpu->R || cpu->W)) {
             printf("%c %02X %02X\n", cpu->W ? 'w' : ' ', cpu->D, cpu->I);
         }
 
         // Состояние ДО выполнения такта CPU
-        if (DEBUG && cpu->ce) {
+        if (DEBUG1 && cpu->ce) {
 
             disam(cpu->A);
             printf("%c%04X R-%02X %s%02X A-%02X X-%02X Y-%02X P-%02X [%04X %c] %s\n",

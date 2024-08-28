@@ -113,7 +113,7 @@ reg         w = 0;
 reg         dma = 0;
 reg         vsync;
 reg  [ 1:0] ct_cpu = 0;
-reg  [ 2:0] finex = 0, _finex = 0;
+reg  [ 2:0] finex = 0, finex_ff = 0;
 reg  [ 7:0] ctrl0;              // $2000
 reg  [ 7:0] ctrl1;              // $2001
 reg  [15:0] bgtile, _bgtile;    // Сохраненное значение тайла фона
@@ -479,7 +479,12 @@ begin
             end
 
             // Генерация обратного синхроимпульса
-            if (px == 0 && py == 257) begin vsync <= 1; nmi <= `NMI_ENABLE & ctrl0[7]; end
+            if (px == 0 && py == 257) begin
+
+                vsync <= 1;
+                nmi   <= `NMI_ENABLE & ctrl0[7];
+
+            end
 
             // Кадр начинается с позиции PY=15, так как 33 пикселя сверху идут для VGA как VBlank
             // Вернуть вертикальным счетчикам  значение из `t` для рисования нового кадра [vert]
@@ -490,6 +495,10 @@ begin
                 oam_hit <= 0;
                 nmi     <= 0;
                 vsync   <= 0;
+
+                // На следующий кадр будет один FineX
+                // В течении кадра его менять нельзя
+                finex   <= finex_ff;
 
             end
 
@@ -567,7 +576,7 @@ begin
 
                             if (w == 0) begin
 
-                                finex    <= cpu_o[2:0]; // FineX
+                                finex_ff <= cpu_o[2:0]; // FineX
                                 t[4:0]   <= cpu_o[7:3]; // CoarseX
 
                             end else begin
