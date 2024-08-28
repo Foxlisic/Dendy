@@ -2,6 +2,7 @@
 
 #define DEBUG1 0
 #define DEBUG2 0
+#define DEBUG3 0
 
 enum OpTypes {
     ___ = 0,
@@ -187,6 +188,133 @@ public:
         }
     }
 
+    uint8_t read(uint16_t A)
+    {
+        // Оперативная память
+        if (A < 0x2000) {
+            return ram[A & 0x7FF];
+        }
+        // Память программ
+        else if (A >= 0x8000) {
+            return program[A & 0x7FFF];
+        }
+
+        return 0xFF;
+    }
+
+    // Писать можно только в память
+    void write(uint16_t A, uint8_t D)
+    {
+        if (A < 0x2000) {
+            ram[A & 0x7FF] = D;
+        }
+    }
+
+    // 1 Такт
+    void tick()
+    {
+        // Для сканлайна 25 Мгц тактируется
+        if (ppu->x2w) { x2line[ppu->x2a] = ppu->x2o; }
+        ppu->x2i = x2line[ppu->x2a];
+
+        // --------------------------------
+        uint16_t PA = ppu->chra;
+
+        // Знакогенератор CHR-ROM и видеопамять для PPU
+        if (PA < 0x2000) {
+            ppu->chrd = chrrom[PA];
+        }
+        // Зеркалирование VRAM [4 страницы] 2Dendy + 2Cartridge
+        else if (PA < 0x3F00) {
+            ppu->chrd = videom[(PA & 0x0FFF) | 0x2000];
+        }
+        // --------------------------------
+
+        // Запись в OAM
+        if (ppu->oam2w) { oam[ppu->oam2a] = ppu->oam2o; }
+
+        // Запись в видеопамять
+        if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00 && ppu->vidw) {
+            videom[0x2000 + (ppu->vida & 0x1FFF)] = ppu->vido;
+        }
+
+        // Чтение OAM, CHR
+        ppu->oamd  = oam[ppu->oama];
+        ppu->oam2i = oam[ppu->oam2a];
+
+        // Чтение CHR или ATTR для CPU: 1FFF
+        if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00) {
+            ppu->vidi  = videom[0x2000 + (ppu->vida & 0x1FFF)];
+        } else if (ppu->vida < 0x2000) {
+            ppu->vidi  = videom[ppu->vida];
+        }
+
+        // -----------------------------------
+
+        // Подготовка данных для PPU
+        ppu->cpu_a = cpu->A;
+        ppu->cpu_o = cpu->D;
+        ppu->cpu_w = cpu->W;
+        ppu->cpu_r = cpu->R;
+
+        // Джойстики
+        ppu->joy1 = joy1;
+        ppu->joy2 = joy2;
+
+        // Читаться для PPU, не CPU.
+        ppu->prgi = read(ppu->prga);
+
+        // Запись и чтение в зависимости от мапперов
+        if (ppu->prgw) { write(ppu->prga, ppu->prgd); }
+
+        // -- PPU здесь --
+        ppu->clock25 = 0; ppu->eval();
+        ppu->clock25 = 1; ppu->eval();
+
+        // Для CPU данные готовятся в PPU
+        cpu->I   = ppu->cpu_i;
+        cpu->ce  = ppu->ce_cpu;
+        cpu->nmi = ppu->nmi;
+
+        debug();
+
+        cpu->clock = 0; cpu->eval();
+        cpu->clock = 1; cpu->eval();
+
+        vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
+    }
+
+    void debug()
+    {
+        if (DEBUG3 && ppu->vidw) {
+            printf("%04X %02X\n", ppu->vida, ppu->vido);
+        }
+
+        // Отладка джойстика
+        if (DEBUG2 && cpu->A == 0x4014 && (cpu->R || cpu->W)) {
+            printf("%c %02X %02X\n", cpu->W ? 'w' : ' ', cpu->D, cpu->I);
+        }
+
+        // Состояние ДО выполнения такта CPU
+        if (DEBUG1 && cpu->ce) {
+
+            disam(cpu->A);
+            printf("%c%04X R-%02X %s%02X R:[%02X %02X %02X %02X] V:[%04X %c] %s\n",
+                (cpu->m0 ? '*' : ' '),
+                cpu->A,
+                cpu->I,
+                (cpu->W ? "W-" : "  "),
+                cpu->D,
+                // --
+                cpu->_a, cpu->_x, cpu->_y, cpu->_p,
+                //
+                ppu->vida,
+                (cpu->nmi ? 'w' : ' '),
+                cpu->m0 ? ds : ""
+            );
+        }
+    }
+
     // Основной цикл работы
     int main()
     {
@@ -263,135 +391,6 @@ public:
         }
     }
 
-    // Обработка одного фрейма
-    // Автоматическая коррекция кол-ва инструкции в секунду
-    void frame()
-    {
-        float target = 80; // X% CPU
-
-        Uint32 start = SDL_GetTicks();
-        for (int i = 0; i < instr; i++) {
-            tick();
-        }
-
-        Uint32 delay = (SDL_GetTicks() - start);
-        instr = (instr * (0.5 * target) / (float)delay);
-        instr = instr < 1000 ? 1000 : instr;
-    }
-
-    uint8_t read(uint16_t A)
-    {
-        // Оперативная память
-        if (A < 0x2000) {
-            return ram[A & 0x7FF];
-        }
-        // Память программ
-        else if (A >= 0x8000) {
-            return program[A & 0x7FFF];
-        }
-
-        return 0xFF;
-    }
-
-    // Писать можно только в память
-    void write(uint16_t A, uint8_t D)
-    {
-        if (A < 0x2000) {
-            ram[A & 0x7FF] = D;
-        }
-    }
-
-    // 1 Такт
-    void tick()
-    {
-        // Для сканлайна 25 Мгц тактируется
-        if (ppu->x2w) { x2line[ppu->x2a] = ppu->x2o; }
-        ppu->x2i = x2line[ppu->x2a];
-
-        uint16_t PA = ppu->chra;
-
-        // Знакогенератор CHR-ROM и видеопамять для PPU
-        if (PA < 0x2000) {
-            ppu->chrd = chrrom[PA];
-        } else if (PA < 0x3F00) {
-            ppu->chrd = videom[(PA & 0x07FF) | 0x2000]; // Зеркалирование VRAM [2 страницы]
-        }
-
-        // Запись в OAM
-        if (ppu->oam2w) { oam[ppu->oam2a] = ppu->oam2o; }
-
-        // Запись в видеопамять
-        if (ppu->vida >= 0x2000 && ppu->vida < 0x3000 && ppu->vidw) {
-            videom[0x2000 + (ppu->vida & 0x1FFF)] = ppu->vido;
-        }
-
-        // Чтение OAM, CHR
-        ppu->oamd  = oam[ppu->oama];
-        ppu->oam2i = oam[ppu->oam2a];
-
-        // Чтение CHR или ATTR для CPU
-        if (ppu->vida >= 0x2000 && ppu->vida < 0x3000) {
-            ppu->vidi  = videom[0x2000 + (ppu->vida & 0x1FFF)];
-        } else if (ppu->vida < 0x2000) {
-            ppu->vidi  = videom[ppu->vida];
-        }
-
-        // -----------------------------------
-
-        // Подготовка данных для PPU
-        ppu->cpu_a = cpu->A;
-        ppu->cpu_o = cpu->D;
-        ppu->cpu_w = cpu->W;
-        ppu->cpu_r = cpu->R;
-
-        // Джойстики
-        ppu->joy1 = joy1;
-        ppu->joy2 = joy2;
-
-        // Читаться для PPU, не CPU.
-        ppu->prgi = read(ppu->prga);
-
-        // Запись и чтение в зависимости от мапперов
-        if (ppu->prgw) { write(ppu->prga, ppu->prgd); }
-
-        // -- PPU здесь --
-        ppu->clock25 = 0; ppu->eval();
-        ppu->clock25 = 1; ppu->eval();
-
-        // Для CPU данные готовятся в PPU
-        cpu->I   = ppu->cpu_i;
-        cpu->ce  = ppu->ce_cpu;
-        cpu->nmi = ppu->nmi;
-
-        // Отладка джойстика
-        if (DEBUG2 && cpu->A == 0x4014 && (cpu->R || cpu->W)) {
-            printf("%c %02X %02X\n", cpu->W ? 'w' : ' ', cpu->D, cpu->I);
-        }
-
-        // Состояние ДО выполнения такта CPU
-        if (DEBUG1 && cpu->ce) {
-
-            disam(cpu->A);
-            printf("%c%04X R-%02X %s%02X A-%02X X-%02X Y-%02X P-%02X [%04X %c] %s\n",
-                (cpu->m0 ? '*' : ' '),
-                cpu->A,
-                cpu->I,
-                (cpu->W ? "W-" : "  "),
-                cpu->D,
-                // --
-                cpu->_a, cpu->_x, cpu->_y, cpu->_p,
-                //
-                ppu->vida,
-                (cpu->nmi ? 'w' : ' '),
-                cpu->m0 ? ds : ""
-            );
-        }
-
-        cpu->clock = 0; cpu->eval();
-        cpu->clock = 1; cpu->eval();
-
-        vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
-    }
 
     // Убрать окно из памяти
     int destroy()

@@ -19,8 +19,8 @@ app: syn
 		obj_dir/Vppu__ALL.a \
 		obj_dir/Vcpu__ALL.a \
 		-lSDL2
-	#./tb roms/02_lode.nes > tb.log
-	./tb roms/02_battlecity.nes > tb.log
+	./tb roms/01_lode.nes > tb.log
+	#./tb roms/02_battlecity.nes > tb.log
 syn:
 	verilator -cc ppu.v > /dev/null
 	verilator -cc cpu.v > /dev/null
