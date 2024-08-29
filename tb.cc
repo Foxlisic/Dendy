@@ -7,7 +7,7 @@
 #define PPU_MODEL 0
 
 // Дебаг CPU
-#define DEBUG1 1
+#define DEBUG1 0
 
 // Порты
 #define DEBUG2 0

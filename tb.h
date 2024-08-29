@@ -179,6 +179,7 @@ protected:
     uint8_t     reg_a, reg_x, reg_y, reg_p, reg_s;
     uint16_t    pc;
     int         cycles_ext = 0;
+    int         dbgfx = 0;
 
     // Эмулятор PPU
     int         vmemsize = 0x7FF;         // Зависит от маппера размер памяти
@@ -338,7 +339,7 @@ public:
 
     uint8_t read(uint16_t A)
     {
-        int I;
+        uint8_t I;
 
         // Оперативная память
         if (A < 0x2000) {
@@ -372,7 +373,7 @@ public:
     int eppu_rw(int A, int I, int R, int W, int D)
     {
         // DMA запись
-        if (A == 0x4014 && W && _ppu_dm == 0) {
+        if (A == 0x4014 && W && _ppu_dm == 0 && cpu->ce) {
 
             for (int i = 0; i < 256; i++) {
                 oam[i] = read(D*256 + i);
@@ -462,10 +463,10 @@ public:
 
                         if (_ppu_w == 0) {
                             _ppu_ff = D & 7; // FineX
-                            _ppu_t  = (_ppu_t & 0xFFE0) | ((D & 0xF8) >> 3); // CoarseX  D[7:3] -> T[4:0]
+                            _ppu_t  = (_ppu_t & ~0x001F) | ((D & 0xF8) >> 3); // CoarseX  D[7:3] -> T[4:0]
                         } else {
-                            _ppu_t  = (_ppu_t & 0x8FFF) | ((D & 3) << 12);   // FineY:   D[2:0] -> T[14:12]
-                            _ppu_t  = (_ppu_t & 0xFC1F) | ((D & 0xF8) << 2); // CoarseY: D[7:3] -> T[9:5]
+                            _ppu_t  = (_ppu_t & ~0x7000) | ((D & 3) << 12);   // FineY:   D[2:0] -> T[14:12]
+                            _ppu_t  = (_ppu_t & ~0x03E0) | ((D & 0xF8) << 2); // CoarseY: D[7:3] -> T[9:5]
                         }
 
                         _ppu_w ^= 1;
@@ -613,9 +614,6 @@ public:
         int A, D, W, R, I;
         int cycles = 1;
 
-        // Уменьшать DMA циклы
-        if (_ppu_dm > 0) _ppu_dm--;
-
         // Эмулятор процессора
         if (PPU_MODEL == 2) {
 
@@ -643,6 +641,9 @@ public:
             cpu->clock = 1; cpu->eval();
         }
 
+        // Уменьшать DMA циклы
+        if (_ppu_dm > 0) _ppu_dm--;
+
         // Обработка 3Т эмулятора PPU
         for (int i = 0; i < 3 * cycles; i++) {
 
@@ -651,8 +652,24 @@ public:
             int cx = (_ppu_v     ) & 0x1F,  // CoarseX   [ 4:0]
                 cy = (_ppu_v >> 5) & 0x1F;  // CoarseY   [ 9:5]
 
-            // Чтение тайла при FineX = 0
-            if (_ppu_fx == 0 && _ppu_px < 256) {
+            // Нарисовать пиксель тайла [пререндер первого тайла]
+            if (_ppu_px >= 8 && _ppu_px < (8+256) && _ppu_py < 240) {
+
+                // Фон не отображается
+                if ((_ppu_c1 & 0x08) == 0) _ppu_bk = 0;
+
+                // Фон не виден в левом углу
+                if ((_ppu_c1 & 0x02) == 0 && _ppu_px < 8) _ppu_bk = 0;
+
+                c = 7 - _ppu_fx;
+                c = ((_ppu_bk >> c) & 1) + 2*((_ppu_bk >> (8 + c)) & 1);
+
+                // Запись пикселя тайла на линию
+                _ppu_bg[_ppu_px - 8] = c ? 4*_ppu_at + c : 0;
+            }
+
+            // Чтение тайла при FineX = 7
+            if (_ppu_fx == 7 && _ppu_px < (256+8)) {
 
                 // Чтение символа
                 _ppu_cd =  0x2000 + cx + (cy << 5) + nt;
@@ -674,23 +691,13 @@ public:
                 _ppu_v = (_ppu_v & ~0x001F) | ((_ppu_v + 1) & 0x1F);
             }
 
-            // Пиксель тайла, старший бит берется из старшего байта (аналогично младший)
-            if (_ppu_px < 256 && _ppu_py < 240) {
-
-                c = 7 - _ppu_fx;
-                c = ((_ppu_bk >> c) & 1) + 2*((_ppu_bk >> (8 + c)) & 1);
-
-                // Запись пикселя тайла на линию
-                _ppu_bg[_ppu_px] = c ? 4*_ppu_at + c : 0;
-
-                // FineX++
-                _ppu_fx = (_ppu_fx + 1) & 7;
-            }
+            // Инкремент FineX
+            if (_ppu_px < (256+8)) _ppu_fx = (_ppu_fx + 1) & 7;
 
             // Нарисовать тайлы и спрайты
-            if (_ppu_px == 256) {
+            if (_ppu_px == 340) {
 
-                _ppu_v  = (_ppu_v & ~0x0400) | (_ppu_t & 0x0400); // T[10]  -> V[10]
+                _ppu_v  = (_ppu_v & ~0x0400) | (_ppu_t & 0x0400); // T[ 10] -> V[ 10]
                 _ppu_v  = (_ppu_v & ~0x001F) | (_ppu_t & 0x001F); // T[4:0] -> V[4:0]
                 _ppu_fx = _ppu_ff;
                 int fy  = (_ppu_v >> 12) & 7;
@@ -718,6 +725,7 @@ public:
                 _ppu_ov = 0;
 
                 // Обработка спрайтов
+                if (_ppu_c1 & 0x10)
                 for (int j = 0; j < 256; j += 4) {
 
                     // Где спрайт начинается
@@ -797,7 +805,7 @@ public:
             }
 
             // NMI: Возникает на 240-й линии
-            if (_ppu_px == 1 && _ppu_py == 241) {
+            if (_ppu_px == 1 && _ppu_py == 240) {
 
                 _ppu_vs = 1;
                 cpu->nmi = _ppu_c0 & 0x80 ? 1 : 0;
@@ -851,7 +859,7 @@ public:
                 disam(pc);
                 printf("%04X %s\n", pc, ds);
 
-            } else if (cpu->ce) {
+            } else if (cpu->ce || PPU_MODEL == 1) {
 
                 disam(cpu->A);
 
@@ -864,7 +872,7 @@ public:
                     // --
                     cpu->_a, cpu->_x, cpu->_y, cpu->_p,
                     //
-                    ppu->vida,
+                    (PPU_MODEL == 1 ? _ppu_dm : ppu->vida),
                     (ppu->vidw ? '~' : ' '),
                     (cpu->nmi ? 'N' : ' '),
                     cpu->m0 ? ds : ""
