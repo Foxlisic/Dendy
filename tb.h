@@ -1,7 +1,15 @@
 #include <SDL2/SDL.h>
 
+// =0 Verilog =1 C++
+#define PPU_MODEL 1
+
+// Дебаг CPU
 #define DEBUG1 0
+
+// Порты
 #define DEBUG2 0
+
+// Видео область
 #define DEBUG3 0
 
 enum OpTypes {
@@ -29,6 +37,30 @@ static const char* OPTABLE[256] =
     /* D0 */ "BNE", "CMP", "___", "DCP", "DOP", "CMP", "DEC", "DCP", "CLD", "CMP", "NOP", "DCP", "DOP", "CMP", "DEC", "DCP",
     /* E0 */ "CPX", "SBC", "DOP", "ISC", "CPX", "SBC", "INC", "ISC", "INX", "SBC", "NOP", "SBC", "CPX", "SBC", "INC", "ISC",
     /* F0 */ "BEQ", "SBC", "___", "ISC", "DOP", "SBC", "INC", "ISC", "SED", "SBC", "NOP", "ISC", "DOP", "SBC", "INC", "ISC"
+};
+
+static const int palette[64] = {
+
+    // 00-0F
+    0x7B7B7B, 0x0000FF, 0x0000BD, 0x4229BD,
+    0x940084, 0xAD0021, 0x8C1000, 0x8C1000,
+    0x522900, 0x007300, 0x006B00, 0x005A00,
+    0x004252, 0x000000, 0x000000, 0x000000,
+    // 10-1F
+    0xBDBDBD, 0x0073F7, 0x0052F7, 0x6B42FF,
+    0xDE00CE, 0xE7005A, 0xF73100, 0xE75A10,
+    0xAD7B00, 0x00AD00, 0x00AD00, 0x00AD42,
+    0x008C8C, 0x000000, 0x000000, 0x000000,
+    // 20-2F
+    0xF7F7F7, 0x39BDFF, 0x6B84FF, 0x9473F7,
+    0xF773F7, 0xF75294, 0xF77352, 0xFFA542,
+    0xF7B500, 0xB5F710, 0x5ADE52, 0x52F794,
+    0x00EFDE, 0x737373, 0x000000, 0x000000,
+    // 30-3F
+    0xFFFFFF, 0xA5E7FF, 0xB5B5F7, 0xD6B5F7,
+    0xF7B5F7, 0xFFA5C6, 0xEFCEAD, 0xFFE7AD,
+    0xFFDE7B, 0xD6F773, 0xB5F7B5, 0xB5F7D6,
+    0x00FFFF, 0xF7D6F7, 0x000000, 0x000000
 };
 
 // Типы операндов для каждого опкода
@@ -76,6 +108,22 @@ protected:
     uint8_t     oam[256];
     uint8_t     x2line[256];
     uint8_t     joy1 = 0, joy2 = 0;
+
+    // Эмулятор PPU
+    int         vmemsize = 0x7FF;         // Зависит от маппера размер памяти
+    uint8_t     _ppu_pa[32];
+    int         _ppu_c0 = 0x10, _ppu_c1 = 0x00,
+                _ppu_ff = 0x00, _ppu_vs = 0x00, // FineXFF, VSync
+                _ppu_zh = 0x00, _ppu_ov = 0x00, // ZeroHit; Sprite Overflow
+                _ppu_w  = 0x00, _ppu_sa = 0x00, // W, SpriteAddress
+                _ppu_sd = 0x00, _ppu_fx = 0x00, // SpriteData, FineX
+                _ppu_va = 0x00, _ppu_ch = 0x00, // CursorAddr, CharLatch
+                _ppu_dm = 0x00;                 // DMA
+    int         _ppu_j0, _ppu_j1, _ppu_j2,
+                _ppu_v  = 0, _ppu_t  = 0,
+                _ppu_px = 0, _ppu_py = 0,
+                _ppu_cd = 0, _ppu_at = 0, _ppu_bk = 0;
+    int         _ppu_bg[256];            // Одна линия (фон и спрайты)
 
     char        ds[256];
 
@@ -135,7 +183,14 @@ public:
         cpu->clock   = 1; cpu->eval();
         cpu->reset_n = 1;
 
+        // Очистить память
         for (int i = 0; i < 256*1024; i++) program[i] = 0;
+
+        // Инициализация
+        _ppu_pa[ 0] = 0x0F; _ppu_pa[ 1] = 0x16; _ppu_pa[ 2] = 0x30; _ppu_pa[ 3] = 0x38;
+        _ppu_pa[ 4] = 0x0F; _ppu_pa[ 5] = 0x16; _ppu_pa[ 6] = 0x26; _ppu_pa[ 7] = 0x07;
+        _ppu_pa[ 8] = 0x0F; _ppu_pa[ 9] = 0x26; _ppu_pa[10] = 0x00; _ppu_pa[11] = 0x30;
+        _ppu_pa[12] = 0x0F; _ppu_pa[13] = 0x38; _ppu_pa[14] = 0x28; _ppu_pa[15] = 0x00;
 
         // Загрузка NES-файла
         if (argc > 1) {
@@ -188,6 +243,21 @@ public:
         }
     }
 
+    // Чтение из видеопамяти
+    uint8_t readv(uint16_t A)
+    {
+        // Знакогенератор CHR-ROM и видеопамять для PPU
+        if (A < 0x2000) {
+            return chrrom[A];
+        }
+        // Зеркалирование VRAM [4 страницы] 2Dendy + 2Cartridge
+        else if (A >= 0x2000 && A < 0x3F00) {
+            return videom[0x2000 + (A & vmemsize)];
+        }
+
+        return 0xFF;
+    }
+
     uint8_t read(uint16_t A)
     {
         // Оперативная память
@@ -210,32 +280,25 @@ public:
         }
     }
 
-    // 1 Такт
+    // 1 Такт CPU + PPU обвязка + VGA
     void tick()
     {
+        // 0xFFF
+        int vmemsize = 0x7FF;
+
         // Для сканлайна 25 Мгц тактируется
         if (ppu->x2w) { x2line[ppu->x2a] = ppu->x2o; }
         ppu->x2i = x2line[ppu->x2a];
 
         // --------------------------------
-        uint16_t PA = ppu->chra;
-
-        // Знакогенератор CHR-ROM и видеопамять для PPU
-        if (PA < 0x2000) {
-            ppu->chrd = chrrom[PA];
-        }
-        // Зеркалирование VRAM [4 страницы] 2Dendy + 2Cartridge
-        else if (PA < 0x3F00) {
-            ppu->chrd = videom[(PA & 0x0FFF) | 0x2000];
-        }
-        // --------------------------------
+        ppu->chrd = readv(ppu->chra);
 
         // Запись в OAM
         if (ppu->oam2w) { oam[ppu->oam2a] = ppu->oam2o; }
 
-        // Запись в видеопамять
+        // Запись в видеопамять [4k]
         if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00 && ppu->vidw) {
-            videom[0x2000 + (ppu->vida & 0x1FFF)] = ppu->vido;
+            videom[0x2000 + (ppu->vida & vmemsize)] = ppu->vido;
         }
 
         // Чтение OAM, CHR
@@ -244,7 +307,7 @@ public:
 
         // Чтение CHR или ATTR для CPU: 1FFF
         if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00) {
-            ppu->vidi  = videom[0x2000 + (ppu->vida & 0x1FFF)];
+            ppu->vidi  = videom[0x2000 + (ppu->vida & vmemsize)];
         } else if (ppu->vida < 0x2000) {
             ppu->vidi  = videom[ppu->vida];
         }
@@ -261,11 +324,11 @@ public:
         ppu->joy1 = joy1;
         ppu->joy2 = joy2;
 
-        // Читаться для PPU, не CPU.
-        ppu->prgi = read(ppu->prga);
-
         // Запись и чтение в зависимости от мапперов
         if (ppu->prgw) { write(ppu->prga, ppu->prgd); }
+
+        // Читаться для PPU, не CPU.
+        ppu->prgi = read(ppu->prga);
 
         // -- PPU здесь --
         ppu->clock25 = 0; ppu->eval();
@@ -277,11 +340,303 @@ public:
         cpu->nmi = ppu->nmi;
 
         debug();
-
         cpu->clock = 0; cpu->eval();
         cpu->clock = 1; cpu->eval();
 
         vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
+    }
+
+    // Работа только процессора [PPU эмулируется]
+    void tick_emulated()
+    {
+        int A = cpu->A, D = cpu->D, W = cpu->W, R = cpu->R, I;
+
+        // Запись или чтение в память
+        if (W) { write(A, D); } I = read(A);
+
+        // DMA запись
+        if (A == 0x4014 && W) {
+
+            for (int i = 0; i < 256; i++) {
+                oam[i] = read(D*256 + i);
+            }
+
+            _ppu_dm = 255;
+        }
+        // Джойстики 1 и 2
+        else if (A == 0x4016) {
+
+            if (W) {
+
+                // Защелка
+                if (_ppu_j0 == 1 && (D & 1) == 0) {
+                    _ppu_j1 = joy1 | 0x800;
+                    _ppu_j2 = joy2 | 0x800;
+                }
+
+                _ppu_j0 = D & 1;
+
+            } else if (R) {
+
+                I = (_ppu_j1 & 1) | 0x40;
+
+                _ppu_j1 >>= 1;
+                _ppu_j2 >>= 1;
+            }
+        }
+        // Запись или чтение в видеорегистры
+        else if (A >= 0x2000 && A <= 0x3FFF) {
+
+            switch (A & 7) {
+
+                // #2000 CTRL0
+                case 0: {
+
+                    if (W) {
+                        _ppu_c0 = D;
+                        _ppu_t  = (_ppu_t & 0xF3FF) | ((D & 3) << 10); // Биты 11..10 в t
+                    } else if (R) {
+                        I = _ppu_c0;
+                    }
+
+                    break;
+                }
+
+                // #2001 CTRL1
+                case 1: if (W) _ppu_c1 = D; else if (R) I = _ppu_c1; break;
+
+                // #2002 STATUS
+                case 2: {
+
+                    if (R) {
+
+                        I = (_ppu_vs << 7) | (_ppu_zh << 6) | (_ppu_ov << 5) | 0x10;
+
+                        _ppu_vs = 0;
+                        _ppu_zh = 0;
+                        _ppu_w  = 0;
+                    }
+
+                    break;
+                }
+
+                // #2003 SPRITE_ADDR
+                case 3: if (W) _ppu_sa = D; break;
+
+                // #2004 SPRITE DATA
+                case 4: {
+
+                    if (W) {
+                        oam[_ppu_sa] = _ppu_sd;
+                    } else if (R) {
+                        I = oam[_ppu_sa];
+                    }
+
+                    _ppu_sa = (_ppu_sa + 1) & 1;
+                    break;
+                }
+
+                // #2005 SCROLL
+                case 5: {
+
+                    if (W) {
+
+                        if (_ppu_w == 0) {
+                            _ppu_ff = D & 7; // FineX
+                            _ppu_t  = (_ppu_t & 0xFFE0) | ((D & 0xF8) >> 3); // CoarseX  D[7:3] -> T[4:0]
+                        } else {
+                            _ppu_t  = (_ppu_t & 0x8FFF) | ((D & 3) << 12);   // FineY:   D[2:0] -> T[14:12]
+                            _ppu_t  = (_ppu_t & 0xFC1F) | ((D & 0xF8) << 2); // CoarseY: D[7:3] -> T[9:5]
+
+                        }
+
+                        _ppu_w ^= 1;
+                    }
+
+                    break;
+                }
+
+                // #2006 PPU ADDRESS
+                case 6: {
+
+                    if (W) {
+
+                        if (_ppu_w == 0) {
+
+                            _ppu_va = (_ppu_va & 0x00FF) | ((D & 0x7F) << 8); // D[6:0] -> VA[14:8]
+                            _ppu_t  = (_ppu_t  & 0x00FF) | ((D & 0x3F) << 8); // D[5:0] -> T[13:8]; T[14] = 0
+
+                        } else {
+
+                            _ppu_va = (_ppu_va & 0xFF00) | (D & 0xFF); // D[7:0] -> VA[7:0]
+                            _ppu_t  = (_ppu_t  & 0xFF00) | (D & 0xFF); // D[7:0] -> T[7:0]
+                            _ppu_v  = _ppu_t;
+                        }
+
+                        _ppu_w ^= 1;
+                    }
+
+                    break;
+                }
+
+                // #2007 PPU DATA
+                case 7: {
+
+                    if (W) {
+
+                        if (_ppu_va >= 0x3F00 && _ppu_va < 0x3F20) {
+                            _ppu_pa[_ppu_va - 0x3F00] = D;
+                        } else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
+                            videom[(_ppu_va & vmemsize) + 0x2000] = D;
+                        }
+
+                    } else if (R) {
+
+                        // PALETTE
+                        if (_ppu_va >= 0x3F00 && _ppu_va < 0x3F20) {
+                            I = _ppu_pa[_ppu_va - 0x3F00];
+                        }
+                        // VIDEO MEMORY
+                        else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
+
+                            I = _ppu_ch;
+                            _ppu_ch = videom[(_ppu_va & vmemsize) + 0x2000];
+                        }
+                        // CHR-ROM
+                        else if (_ppu_va < 0x2000) {
+                            I = _ppu_ch;
+                            _ppu_ch = videom[_ppu_va];
+                        }
+                    }
+
+                    _ppu_va += (_ppu_c0 & 4 ? 32 : 1);
+                    _ppu_va &= 0x3FFF;
+                    break;
+                }
+            }
+        }
+
+        cpu->I  = I;
+        cpu->ce = (_ppu_dm == 0) ? 1 : 0;
+
+        // Уменьшать DMA циклы
+        if (_ppu_dm) _ppu_dm--;
+
+        debug();
+
+        /* Временно отключить
+        cpu->clock = 0; cpu->eval();
+        cpu->clock = 1; cpu->eval();
+        */
+
+        // Обработка 3Т эмулятора PPU
+        for (int i = 0; i < 3; i++) {
+
+            int c;
+            int nt = _ppu_v & 0xC00;        // Nametable [11:10]
+            int cx = (_ppu_v     ) & 0x1F,  // CoarseX   [ 4:0]
+                cy = (_ppu_v >> 5) & 0x1F;  // CoarseY   [ 9:5]
+
+            // Чтение тайла при FineX = 0
+            if (_ppu_fx == 0 && _ppu_px < 256) {
+
+                // Чтение символа
+                _ppu_cd =  0x2000 + cx + (cy << 5) + nt;
+                _ppu_cd = readv(_ppu_cd);
+                _ppu_cd = (_ppu_c0 & 0x10 ? 0x1000 : 0) + 16*_ppu_cd + ((_ppu_v >> 12) & 7);
+
+                // Чтение битовой маски
+                _ppu_bk = readv(_ppu_cd) + 256*readv(8 + _ppu_cd);
+
+                // Запрос цветового атрибута
+                _ppu_cd = 0x23C0 + ((cx >> 2) & 7) + 8*((cy >> 2) & 7) + nt;
+                _ppu_cd = readv(_ppu_cd);
+                _ppu_at = (_ppu_cd >> ((2*(cy & 2) | (cx & 2)))) & 3;
+
+                // Смена NT [горизонтальный]
+                if ((_ppu_v & 0x1F) == 0x1F) _ppu_v ^= 0x400;
+
+                // Инкремент CoarseX
+                _ppu_v = (_ppu_v & ~0x001F) | ((_ppu_v + 1) & 0x1F);
+            }
+
+            // Пиксель тайла, старший бит берется из старшего байта (аналогично младший)
+            if (_ppu_px < 256 && _ppu_py < 240) {
+
+                c = 7 - _ppu_fx;
+                c = ((_ppu_bk >> c) & 1) + 2*((_ppu_bk >> (8 + c)) & 1);
+
+                // Запись пикселя тайла на линию
+                _ppu_bg[_ppu_px] = c ? 4*_ppu_at + c : 0;
+
+                // FineX++
+                _ppu_fx = (_ppu_fx + 1) & 7;
+            }
+
+            // Нарисовать тайлы и спрайты
+            if (_ppu_px == 256) {
+
+                _ppu_v  = (_ppu_v & ~0x0400) | (_ppu_t & 0x0400); // T[10]  -> V[10]
+                _ppu_v  = (_ppu_v & ~0x001F) | (_ppu_t & 0x001F); // T[4:0] -> V[4:0]
+                _ppu_fx = _ppu_ff;
+                int fy  = (_ppu_v >> 12) & 7;
+
+                if (fy == 7) {
+
+                    // Смена NT [Vertical]
+                    if      (cy == 29) { cy = 0; _ppu_v ^= 0x800; }
+                    else if (cy == 31) { cy = 0; }
+                    else cy++;
+
+                    // CoarseY++
+                    _ppu_v = (_ppu_v & ~0x03E0) | (cy << 5);
+                }
+
+                fy = (fy + 1) & 7;
+
+                // FineY++
+                _ppu_v = (_ppu_v & ~0x7000) | (fy << 12);
+
+                // @TODO обработка спрайтов
+
+                // Отрисовка линии
+                for (int j = 0; j < 256; j++) {
+
+                    int c = palette[_ppu_pa[ _ppu_bg[j] ]];
+                    pset(64 + 2*j, 2*_ppu_py,   c); pset(65 + 2*j, 2*_ppu_py,   c);
+                    pset(64 + 2*j, 2*_ppu_py+1, c); pset(65 + 2*j, 2*_ppu_py+1, c);
+                }
+            }
+
+            // NMI
+            if (_ppu_px == 1 && _ppu_py == 241) {
+                _ppu_vs = 1;
+
+                // cpu->nmi = _ppu_c0 & 0x80 ? 1 : 0;
+            }
+
+            // Последняя строчка кадра
+            if (_ppu_px == 1 && _ppu_py == 260) {
+
+                // 14:11, 9:5 :: 0yyy u0YY YYY0 0000
+                _ppu_v  = (_ppu_v & ~0x7BE0) | (_ppu_t & 0x7BE0);
+                _ppu_vs = 0;
+                _ppu_zh = 0;
+
+                cpu->nmi = 0;
+            }
+
+            _ppu_px++;
+
+            // Отсчет тактов
+            if (_ppu_px == 341) {
+                _ppu_px = 0;
+                _ppu_py++;
+                if (_ppu_py == 262) {
+                    _ppu_py = 0;
+                }
+            }
+        }
     }
 
     void debug()
@@ -299,7 +654,7 @@ public:
         if (DEBUG1 && cpu->ce) {
 
             disam(cpu->A);
-            printf("%c%04X R-%02X %s%02X R:[%02X %02X %02X %02X] V:[%04X %c] %s\n",
+            printf("%c%04X R-%02X %s%02X R:[%02X %02X %02X %02X] V:[%04X %c] %c %s\n",
                 (cpu->m0 ? '*' : ' '),
                 cpu->A,
                 cpu->I,
@@ -309,7 +664,8 @@ public:
                 cpu->_a, cpu->_x, cpu->_y, cpu->_p,
                 //
                 ppu->vida,
-                (cpu->nmi ? 'w' : ' '),
+                (ppu->vidw ? '~' : ' '),
+                (cpu->nmi ? 'N' : ' '),
                 cpu->m0 ? ds : ""
             );
         }
@@ -356,7 +712,7 @@ public:
 
                 for (int i = 0; i < 4096; i++) {
 
-                    tick();
+                    if (PPU_MODEL) tick_emulated(); else tick();
                     count++;
                 }
 
@@ -390,7 +746,6 @@ public:
             case SDL_SCANCODE_RIGHT:    joy1 = (joy1 & 0b01111111) | (press ? 128  : 0); break;
         }
     }
-
 
     // Убрать окно из памяти
     int destroy()
@@ -439,18 +794,18 @@ public:
         switch (OPTYPES[a1])
         {
             case IMP: sprintf(ds, "%s",             OPTABLE[a1]); break;
-            case NDX: sprintf(ds, "%s (%02X+X)",    OPTABLE[a1], a2); break;
-            case NDY: sprintf(ds, "%s (%02X),Y",    OPTABLE[a1], a2); break;
-            case ZP:  sprintf(ds, "%s (%02X)",      OPTABLE[a1], a2); break;
-            case ZPX: sprintf(ds, "%s (%02X+X)",    OPTABLE[a1], a2); break;
-            case ZPY: sprintf(ds, "%s (%02X+Y)",    OPTABLE[a1], a2); break;
+            case NDX: sprintf(ds, "%s ($%02X+X)",   OPTABLE[a1], a2); break;
+            case NDY: sprintf(ds, "%s ($%02X),Y",   OPTABLE[a1], a2); break;
+            case ZP:  sprintf(ds, "%s ($%02X)",     OPTABLE[a1], a2); break;
+            case ZPX: sprintf(ds, "%s ($%02X+X)",   OPTABLE[a1], a2); break;
+            case ZPY: sprintf(ds, "%s ($%02X+Y)",   OPTABLE[a1], a2); break;
             case IMM: sprintf(ds, "%s #%02X",       OPTABLE[a1], a2); break;
-            case ABS: sprintf(ds, "%s #%04X",       OPTABLE[a1], a2 + a3*256); break;
-            case ABX: sprintf(ds, "%s #%04X,X",     OPTABLE[a1], a2 + a3*256); break;
-            case ABY: sprintf(ds, "%s #%04X,Y",     OPTABLE[a1], a2 + a3*256); break;
+            case ABS: sprintf(ds, "%s $%04X",       OPTABLE[a1], a2 + a3*256); break;
+            case ABX: sprintf(ds, "%s $%04X,X",     OPTABLE[a1], a2 + a3*256); break;
+            case ABY: sprintf(ds, "%s $%04X,Y",     OPTABLE[a1], a2 + a3*256); break;
             case ACC: sprintf(ds, "%s A",           OPTABLE[a1]); break;
-            case REL: sprintf(ds, "%s #%04X",       OPTABLE[a1], a + 2 + (char)a2); break;
-            case IND: sprintf(ds, "%s (%04X)",      OPTABLE[a1], a2 + a3*256); break;
+            case REL: sprintf(ds, "%s $%04X",       OPTABLE[a1], a + 2 + (char)a2); break;
+            case IND: sprintf(ds, "%s ($%04X)",     OPTABLE[a1], a2 + a3*256); break;
         }
     }
 };

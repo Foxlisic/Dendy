@@ -161,7 +161,7 @@ if (reset_n == 1'b0) begin
     y   <= 8'h81;
     s   <= 8'h00;
     //            SV     ZC
-    p       <= 8'b0101_1000;
+    p       <= 8'b0000_0010;
     pc      <= 16'h0000;
     nmitr   <= 1'b0;
     intr    <= IRQ_RST;
@@ -274,8 +274,8 @@ else if (ce) begin
     // -------------------------------------------------------------
 
     // Indirect, X: Читать из #D+X значение 16-битного адреса
-    NDX:  begin t <= NDX2; cp <= Xi[7:0];   pc <= pcn; m  <= 1; end
-    NDX2: begin t <= NDX3; cp <= cpn;       tr <= I;   end
+    NDX:  begin t <= NDX2; cp <= Xi[7:0];   m  <= 1; pc <= pcn; end
+    NDX2: begin t <= NDX3; cp <= cpn[7:0];  tr <= I;   end
     NDX3: begin t <= LAT;  cp <= itr;       {R,W} <= {rd,~rd}; end
 
     // Indirect, Y: Читать из (#D) 16 битный адрес + Y
@@ -340,8 +340,8 @@ else if (ce) begin
         8'b101_xx1_00, 8'hA0, 8'hA8, 8'h88, 8'hC8: begin y <= ar[7:0]; p <= ap; end
 
         // CP[XY] D :: BIT
-        8'hC0,8'hC4,8'hC8,
-        8'hE0,8'hE4,8'hE8,
+        8'hC0,8'hC4,8'hCC,
+        8'hE0,8'hE4,8'hEC,
         8'h24,8'h2C: begin p <= ap; end
 
         // Инструкция [6T] STA,STX,STY

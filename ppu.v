@@ -190,7 +190,7 @@ wire showsp = ctrl1[4] && (ctrl1[2] || ctrl1[2] == 0 && rx >= 8);
 
 // -- Слой 0: Задний план :: ctrl1[3] =1 Фон отображается
 wire [1:0]  back_a = {bgtile[{1'b1, ~finex}], bgtile[{1'b0, ~finex}]};
-wire [4:0]  back_b = back_a && showbg ? {bgattr[1:0], back_a} : 5'b0;
+wire [4:0]  back_b = back_a && showbg ? {bgattr[1:0], back_a} : 5'b0_00_00;
 
 // -- Слой 1: Спрайты :: ctrl1[4] =1 Спрайты отображаются
 wire [4:0]  pipe_0 = (showsp && oam_id >= 1 && sp0_b && sp0_u && sp0_i[1:0]) ? sp0_i : back_b;
@@ -213,9 +213,9 @@ if (reset_n == 1'b0)
 begin
 
     x           <= 0;
-    y           <= 1;       // 0|1
+    y           <= 0;       // 0|1
     px          <= 0;
-    py          <= 16;       // 0|16
+    py          <= 0;       // 0|16
     nmi         <= 0;
     finex       <= 0;
     ce_cpu      <= 0;
@@ -384,8 +384,8 @@ begin
             5: begin
 
                 oam_st   <= oam_id == 7 ? 8 : 1;
-                oam_hit  <= oam_id == 0 && sp[0][15:0];
                 oam_id   <= oam_id + 1;
+                oam_hit  <= {sp_chrd, sp[0][7:0]} && (oama == 4);
 
                 sp[oam_id][ 15:8] <= sp_chrd; // BGTop
 
@@ -460,6 +460,9 @@ begin
                 // Вернуть горизонтальным счетчикам значение из `t` для рисования новой строки [horiz]
                 {v[10], v[4:0]} <= {t[10], t[4:0]};
 
+                // Выставить FINE здесь
+                finex <= finex_ff;
+
                 // Инкремент CoarseY
                 if (fine_y == 7)
                 begin
@@ -479,7 +482,7 @@ begin
             end
 
             // Генерация обратного синхроимпульса
-            if (px == 1 && py == 256) begin
+            if (px == 1 && py == 257) begin
 
                 vsync <= 1;
                 nmi   <= `NMI_ENABLE & ctrl0[7];
@@ -495,10 +498,6 @@ begin
                 oam_hit <= 0;
                 nmi     <= 0;
                 vsync   <= 0;
-
-                // На следующий кадр будет один FineX
-                // В течении кадра его менять нельзя
-                finex   <= finex_ff;
 
             end
 
@@ -603,6 +602,7 @@ begin
 
                                 va[7:0] <= cpu_o;
                                 t[7:0]  <= cpu_o;
+                                v       <= {t[14:8], cpu_o};
 
                             end
 
@@ -674,12 +674,16 @@ begin
                     // Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
 
+                        // В денди не читает, но мало ли
+                        0: if (cpu_r) cpu_i <= ctrl0;
+                        1: if (cpu_r) cpu_i <= ctrl1;
+
                         // Запись или чтение OAM
                         4: if (cpu_w) begin oam2a <= oam2a + 1; end
                                  else begin oam2a <= oam2a + 1; cpu_i <= oam2i; end
 
                         // Чтение из памяти байта
-                        7: if (cpu_r) begin vidch <= vidi; end
+                        7: if (cpu_r && va < 16'h3F00) vidch <= vidi;
 
                     endcase
 
