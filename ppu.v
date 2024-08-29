@@ -616,13 +616,20 @@ begin
                             if (cpu_w) begin
 
                                 // $3F00-$3F1F Палитры
-                                if      (va >= 16'h3F00 && va < 16'h3F10) begin bgpal[va[3:0]] <= cpu_o; vidch <= cpu_o; end
-                                else if (va >= 16'h3F10 && va < 16'h3F20) begin sppal[va[3:0]] <= cpu_o; vidch <= cpu_o; end
-                                else vidw <= 1;
+                                if (va >= 16'h3F00 && va < 16'h4000) begin
 
-                                vida <= va;
-                                vido <= cpu_o;
-                                vidw <= 1;
+                                    if (va[4]) sppal[va[3:0]] <= cpu_o;
+                                    else       bgpal[va[3:0]] <= cpu_o;
+
+                                    vidch <= cpu_o;
+
+                                end else begin
+
+                                    vida <= va;
+                                    vido <= cpu_o;
+                                    vidw <= 1;
+
+                                end
 
                             end else if (cpu_r) begin
 
@@ -630,8 +637,14 @@ begin
                                 cpu_i <= vidch;
 
                                 // $3F00-$3F1F Палитры
-                                if      (va >= 16'h3F00 && va < 16'h3F10) cpu_i <= bgpal[va[3:0]];
-                                else if (va >= 16'h3F10 && va < 16'h3F20) cpu_i <= sppal[va[3:0]];
+                                if (va >= 16'h3F00 && va < 16'h4000) begin
+
+                                    if (va[4]) cpu_i <= sppal[va[3:0]];
+                                    else       cpu_i <= bgpal[va[3:0]];
+
+                                    vidch <= cpu_o;
+
+                                end
 
                             end
 
