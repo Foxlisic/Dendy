@@ -20,7 +20,7 @@ app: syn
 		obj_dir/Vcpu__ALL.a \
 		-lSDL2
 	#./tb roms/01_lode.nes > tb.log
-	./tb roms/01_lode.nes roms/01_video.bin roms/01_oam.nes > tb.log
+	./tb roms/01_lode.nes roms/01_video.bin roms/01_oam.bin > tb.log
 	#./tb roms/02_battlecity.nes > tb.log
 	#./tb roms/04_mario.nes > tb.log
 syn:

@@ -192,6 +192,11 @@ public:
         _ppu_pa[ 8] = 0x0F; _ppu_pa[ 9] = 0x26; _ppu_pa[10] = 0x00; _ppu_pa[11] = 0x30;
         _ppu_pa[12] = 0x0F; _ppu_pa[13] = 0x38; _ppu_pa[14] = 0x28; _ppu_pa[15] = 0x00;
 
+        _ppu_pa[16] = 0x0F; _ppu_pa[17] = 0x16; _ppu_pa[18] = 0x27; _ppu_pa[19] = 0x12;
+        _ppu_pa[20] = 0x0F; _ppu_pa[21] = 0x30; _ppu_pa[22] = 0x2B; _ppu_pa[23] = 0x16;
+        _ppu_pa[24] = 0x0F; _ppu_pa[25] = 0x39; _ppu_pa[26] = 0x28; _ppu_pa[27] = 0x27;
+        _ppu_pa[28] = 0x0F; _ppu_pa[29] = 0x30; _ppu_pa[30] = 0x30; _ppu_pa[31] = 0x30;
+
         // Загрузка NES-файла
         if (argc > 1) {
 
@@ -524,10 +529,9 @@ public:
 
         debug();
 
-        /* Временно отключить
-        cpu->clock = 0; cpu->eval();
-        cpu->clock = 1; cpu->eval();
-        */
+        // Временно отключить
+        // cpu->clock = 0; cpu->eval();
+        // cpu->clock = 1; cpu->eval();
 
         // Обработка 3Т эмулятора PPU
         for (int i = 0; i < 3; i++) {
@@ -597,7 +601,57 @@ public:
                 // FineY++
                 _ppu_v = (_ppu_v & ~0x7000) | (fy << 12);
 
-                // @TODO обработка спрайтов
+                // Высота спрайта либо 16, либо 8
+                int sp_height = (_ppu_c0 & 0x20) ? 16 : 8;
+                int sp_cnt = 0;
+
+                _ppu_ov = 0;
+
+                // Обработка спрайтов
+                for (int j = 0; j < 256; j += 4) {
+
+                    // Где спрайт начинается
+                    int sp_y = _ppu_py - (oam[j] - 1);
+
+                    // Рисовать спрайт на линии
+                    if (sp_y >= 0 && sp_y < sp_height && sp_cnt < 8) {
+
+                        int sp_ch = oam[j + 1];     // Иконка спрайта
+                        int sp_at = oam[j + 2];     // Атрибуты
+                        int sp_x  = oam[j + 3];     // Откуда начинается
+
+                        // Отражение по вертикальной оси
+                        if (sp_at & 0x80) sp_y = sp_height - 1 - sp_y;
+
+                        // Цветовая палитра
+                        int sp_a  = (sp_y & 7) + (_ppu_c0 & 8 ? 0x1000 : 0);
+                        int sp_pl = (sp_at & 3);
+
+                        if (_ppu_c0 & 0x20) { // 16x8
+                            sp_a += ((sp_ch & 0xFE) << 4) + (sp_y & 8 ? 16 : 0);
+                        } else { // 8x8
+                            sp_a += (sp_ch << 4);
+                        }
+
+                        // Прочесть пиксельные данные
+                        int sp_pp = readv(sp_a) + 256*readv(sp_a+8);
+
+                        // Отрисовка 8 бит
+                        for (int k = 0; k < 8; k++) {
+
+                            int kx    = (sp_at & 0x40) ? k : (7-k);
+                            int sp_cc = ((sp_pp >> kx) & 1) | 2*((sp_pp >> (8 + kx) & 1));
+
+                            if (sp_cc) {
+                                _ppu_bg[sp_x + k] = 16 + 4*sp_pl + sp_cc;
+                            }
+                        }
+
+                        sp_cnt++;
+                        if (sp_cnt) _ppu_ov = 1;
+                    }
+
+                }
 
                 // Отрисовка линии
                 for (int j = 0; j < 256; j++) {
