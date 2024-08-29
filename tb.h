@@ -1,10 +1,10 @@
 #include <SDL2/SDL.h>
 
-// =0 Verilog =1 C++
-#define PPU_MODEL 1
+// =0 Verilog =1 PPU C++ =2 CPU+PPU C++
+#define PPU_MODEL 2
 
 // Дебаг CPU
-#define DEBUG1 0
+#define DEBUG1 1
 
 // Порты
 #define DEBUG2 0
@@ -13,9 +13,22 @@
 #define DEBUG3 0
 
 enum OpTypes {
-    ___ = 0,
     IMP = 1, NDX =  2, NDY =  3, ZP  =  4, ZPX =  5, ZPY =  6, IMM =  7,
     ABS = 8, ABX =  9, ABY = 10, ACC = 11, REL = 12, IND = 13,
+};
+
+// Инструкции
+enum OpInstr {
+    ___ = 0,  BRK = 1,  ORA = 2,  AND = 3,  EOR = 4,  ADC = 5,  STA = 6,  LDA = 7,
+    CMP = 8,  SBC = 9,  BPL = 10, BMI = 11, BVC = 12, BVS = 13, BCC = 14, BCS = 15,
+    BNE = 16, BEQ = 17, JSR = 18, RTI = 19, RTS = 20, LDY = 21, CPY = 22, CPX = 23,
+    ASL = 24, PHP = 25, CLC = 26, BIT = 27, ROL = 28, PLP = 29, SEC = 30, LSR = 31,
+    PHA = 32, PLA = 33, JMP = 34, CLI = 35, ROR = 36, SEI = 37, STY = 38, STX = 39,
+    DEY = 40, TXA = 41, TYA = 42, TXS = 43, LDX = 44, TAY = 45, TAX = 46, CLV = 47,
+    TSX = 48, DEC = 49, INY = 50, DEX = 51, CLD = 52, INC = 53, INX = 54, NOP = 55,
+    SED = 56, AAC = 57, SLO = 58, RLA = 59, RRA = 60, SRE = 61, DCP = 62, ISC = 63,
+    LAX = 64, AAX = 65, ASR = 66, ARR = 67, ATX = 68, AXS = 69, XAA = 70, AXA = 71,
+    SYA = 72, SXA = 73, DOP = 74,
 };
 
 static const char* OPTABLE[256] =
@@ -37,6 +50,71 @@ static const char* OPTABLE[256] =
     /* D0 */ "BNE", "CMP", "___", "DCP", "DOP", "CMP", "DEC", "DCP", "CLD", "CMP", "NOP", "DCP", "DOP", "CMP", "DEC", "DCP",
     /* E0 */ "CPX", "SBC", "DOP", "ISC", "CPX", "SBC", "INC", "ISC", "INX", "SBC", "NOP", "SBC", "CPX", "SBC", "INC", "ISC",
     /* F0 */ "BEQ", "SBC", "___", "ISC", "DOP", "SBC", "INC", "ISC", "SED", "SBC", "NOP", "ISC", "DOP", "SBC", "INC", "ISC"
+};
+
+// Имена инструкции
+static const int opcode_names[256] = {
+
+    /*        00  01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F */
+    /* 00 */ BRK, ORA, ___, SLO, DOP, ORA, ASL, SLO, PHP, ORA, ASL, AAC, DOP, ORA, ASL, SLO,
+    /* 10 */ BPL, ORA, ___, SLO, DOP, ORA, ASL, SLO, CLC, ORA, NOP, SLO, DOP, ORA, ASL, SLO,
+    /* 20 */ JSR, AND, ___, RLA, BIT, AND, ROL, RLA, PLP, AND, ROL, AAC, BIT, AND, ROL, RLA,
+    /* 30 */ BMI, AND, ___, RLA, DOP, AND, ROL, RLA, SEC, AND, NOP, RLA, DOP, AND, ROL, RLA,
+    /* 40 */ RTI, EOR, ___, SRE, DOP, EOR, LSR, SRE, PHA, EOR, LSR, ASR, JMP, EOR, LSR, SRE,
+    /* 50 */ BVC, EOR, ___, SRE, DOP, EOR, LSR, SRE, CLI, EOR, NOP, SRE, DOP, EOR, LSR, SRE,
+    /* 60 */ RTS, ADC, ___, RRA, DOP, ADC, ROR, RRA, PLA, ADC, ROR, ARR, JMP, ADC, ROR, RRA,
+    /* 70 */ BVS, ADC, ___, RRA, DOP, ADC, ROR, RRA, SEI, ADC, NOP, RRA, DOP, ADC, ROR, RRA,
+    /* 80 */ DOP, STA, DOP, AAX, STY, STA, STX, AAX, DEY, DOP, TXA, XAA, STY, STA, STX, AAX,
+    /* 90 */ BCC, STA, ___, AXA, STY, STA, STX, AAX, TYA, STA, TXS, AAX, SYA, STA, SXA, AAX,
+    /* A0 */ LDY, LDA, LDX, LAX, LDY, LDA, LDX, LAX, TAY, LDA, TAX, ATX, LDY, LDA, LDX, LAX,
+    /* B0 */ BCS, LDA, ___, LAX, LDY, LDA, LDX, LAX, CLV, LDA, TSX, LAX, LDY, LDA, LDX, LAX,
+    /* C0 */ CPY, CMP, DOP, DCP, CPY, CMP, DEC, DCP, INY, CMP, DEX, AXS, CPY, CMP, DEC, DCP,
+    /* D0 */ BNE, CMP, ___, DCP, DOP, CMP, DEC, DCP, CLD, CMP, NOP, DCP, DOP, CMP, DEC, DCP,
+    /* E0 */ CPX, SBC, DOP, ISC, CPX, SBC, INC, ISC, INX, SBC, NOP, SBC, CPX, SBC, INC, ISC,
+    /* F0 */ BEQ, SBC, ___, ISC, DOP, SBC, INC, ISC, SED, SBC, NOP, ISC, DOP, SBC, INC, ISC
+};
+
+// Типы операндов для каждого опкода
+static const int operand_types[256] = {
+
+    /*       00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F */
+    /* 00 */ IMP, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, ABS, ABS, ABS, ABS,
+    /* 10 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 20 */ ABS, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, ABS, ABS, ABS, ABS,
+    /* 30 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 40 */ IMP, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, ABS, ABS, ABS, ABS,
+    /* 50 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 60 */ IMP, NDX, ___, NDX, ZP , ZP , ZP , ZP , IMP, IMM, ACC, IMM, IND, ABS, ABS, ABS,
+    /* 70 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* 80 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* 90 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPY, ZPY, IMP, ABY, IMP, ABY, ABX, ABX, ABY, ABX,
+    /* A0 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* B0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPY, ZPY, IMP, ABY, IMP, ABY, ABX, ABX, ABY, ABY,
+    /* C0 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* D0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX,
+    /* E0 */ IMM, NDX, IMM, NDX, ZP , ZP , ZP , ZP , IMP, IMM, IMP, IMM, ABS, ABS, ABS, ABS,
+    /* F0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX
+};
+
+// Количество циклов на опкод
+static const int cycles_basic[256] = {
+
+    7, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    6, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6,
+    2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,
+    2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
+    2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
+    2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
+    2, 5, 2, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
+    2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    2, 6, 3, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7
 };
 
 static const int palette[64] = {
@@ -108,6 +186,11 @@ protected:
     uint8_t     oam[256];
     uint8_t     x2line[256];
     uint8_t     joy1 = 0, joy2 = 0;
+
+    // CPU
+    uint8_t     reg_a, reg_x, reg_y, reg_p, reg_s;
+    uint16_t    pc;
+    int         cycles_ext = 0;
 
     // Эмулятор PPU
     int         vmemsize = 0x7FF;         // Зависит от маппера размер памяти
@@ -246,6 +329,8 @@ public:
                 fclose(fp);
             }
         }
+
+        pc = program[0x7FFC] + 256*program[0x7FFD];
     }
 
     // Чтение из видеопамяти
@@ -265,28 +350,207 @@ public:
 
     uint8_t read(uint16_t A)
     {
+        int I;
+
         // Оперативная память
         if (A < 0x2000) {
-            return ram[A & 0x7FF];
+            I = ram[A & 0x7FF];
         }
         // Память программ
         else if (A >= 0x8000) {
-            return program[A & 0x7FFF];
+            I = program[A & 0x7FFF];
         }
 
-        return 0xFF;
+        return eppu_rw(A, I, 1, 0, 0);
     }
 
     // Писать можно только в память
     void write(uint16_t A, uint8_t D)
     {
+        if (PPU_MODEL == 2) {
+            eppu_rw(A, 0, 0, 1, D);
+        }
+
         if (A < 0x2000) {
             ram[A & 0x7FF] = D;
         }
     }
 
+    // Обращение к эмулятору PPU
+    int eppu_rw(int A, int I, int R, int W, int D)
+    {
+        if (PPU_MODEL != 2) return I;
+
+        // DMA запись
+        if (A == 0x4014 && W && _ppu_dm == 0) {
+
+            for (int i = 0; i < 256; i++) {
+                oam[i] = read(D*256 + i);
+            }
+
+            _ppu_dm = 255;
+        }
+        // Джойстики 1 и 2
+        else if (A == 0x4016) {
+
+            if (W) {
+
+                // Защелка
+                if (_ppu_j0 == 1 && (D & 1) == 0) {
+                    _ppu_j1 = joy1 | 0x800;
+                    _ppu_j2 = joy2 | 0x800;
+                }
+
+                _ppu_j0 = D & 1;
+
+            } else if (R) {
+
+                I = (_ppu_j1 & 1) | 0x40;
+
+                _ppu_j1 >>= 1;
+                _ppu_j2 >>= 1;
+            }
+        }
+        // Запись или чтение в видеорегистры
+        else if (A >= 0x2000 && A <= 0x3FFF) {
+
+            ppu->vida = _ppu_va;
+
+            switch (A & 7) {
+
+                // #2000 CTRL0
+                case 0: {
+
+                    if (W) {
+                        _ppu_c0 = D;
+                        _ppu_t  = (_ppu_t & 0xF3FF) | ((D & 3) << 10); // Биты 11..10 в t
+                    } else if (R) {
+                        I = _ppu_c0;
+                    }
+
+                    break;
+                }
+
+                // #2001 CTRL1
+                case 1: if (W) _ppu_c1 = D; else if (R) I = _ppu_c1; break;
+
+                // #2002 STATUS
+                case 2: {
+
+                    if (R) {
+
+                        I = (_ppu_vs << 7) | (_ppu_zh << 6) | (_ppu_ov << 5) | 0x10;
+    printf("-> %x\n", I);
+                        _ppu_vs = 0;
+                        _ppu_zh = 0;
+                        _ppu_w  = 0;
+                    }
+
+                    break;
+                }
+
+                // #2003 SPRITE_ADDR
+                case 3: if (W) _ppu_sa = D; break;
+
+                // #2004 SPRITE DATA
+                case 4: {
+
+                    if (W) {
+                        oam[_ppu_sa] = _ppu_sd;
+                    } else if (R) {
+                        I = oam[_ppu_sa];
+                    }
+
+                    _ppu_sa = (_ppu_sa + 1) & 1;
+                    break;
+                }
+
+                // #2005 SCROLL
+                case 5: {
+
+                    if (W) {
+
+                        if (_ppu_w == 0) {
+                            _ppu_ff = D & 7; // FineX
+                            _ppu_t  = (_ppu_t & 0xFFE0) | ((D & 0xF8) >> 3); // CoarseX  D[7:3] -> T[4:0]
+                        } else {
+                            _ppu_t  = (_ppu_t & 0x8FFF) | ((D & 3) << 12);   // FineY:   D[2:0] -> T[14:12]
+                            _ppu_t  = (_ppu_t & 0xFC1F) | ((D & 0xF8) << 2); // CoarseY: D[7:3] -> T[9:5]
+                        }
+
+                        _ppu_w ^= 1;
+                    }
+
+                    break;
+                }
+
+                // #2006 PPU ADDRESS
+                case 6: {
+
+                    if (W) {
+
+                        if (_ppu_w == 0) {
+
+                            _ppu_va = (_ppu_va & 0x00FF) | ((D & 0x7F) << 8); // D[6:0] -> VA[14:8]
+                            _ppu_t  = (_ppu_t  & 0x00FF) | ((D & 0x3F) << 8); // D[5:0] -> T[13:8]; T[14] = 0
+
+                        } else {
+
+                            _ppu_va = (_ppu_va & 0xFF00) | (D & 0xFF); // D[7:0] -> VA[7:0]
+                            _ppu_t  = (_ppu_t  & 0xFF00) | (D & 0xFF); // D[7:0] -> T[7:0]
+                            _ppu_v  = _ppu_t;
+                        }
+
+                        _ppu_w ^= 1;
+                    }
+
+                    break;
+                }
+
+                // #2007 PPU DATA
+                case 7: {
+
+                    if (W) {
+
+                        if (_ppu_va >= 0x3F00 && _ppu_va < 0x3F20) {
+                            _ppu_pa[_ppu_va - 0x3F00] = D;
+                            _ppu_ch = D;
+
+                        } else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
+                            videom[(_ppu_va & vmemsize) + 0x2000] = D;
+                        }
+
+                    } else if (R) {
+
+                        // PALETTE
+                        if (_ppu_va >= 0x3F00 && _ppu_va < 0x3F20) {
+                            I = _ppu_pa[_ppu_va - 0x3F00];
+                        }
+                        // VIDEO MEMORY
+                        else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
+
+                            I = _ppu_ch;
+                            _ppu_ch = videom[(_ppu_va & vmemsize) + 0x2000];
+                        }
+                        // CHR-ROM
+                        else if (_ppu_va < 0x2000) {
+                            I = _ppu_ch;
+                            _ppu_ch = videom[_ppu_va];
+                        }
+                    }
+
+                    _ppu_va += (_ppu_c0 & 4 ? 32 : 1);
+                    _ppu_va &= 0x3FFF;
+                    break;
+                }
+            }
+        }
+
+        return I;
+    }
+
     // 1 Такт CPU + PPU обвязка + VGA
-    void tick()
+    int tick()
     {
         // 0xFFF
         int vmemsize = 0x7FF;
@@ -349,192 +613,48 @@ public:
         cpu->clock = 1; cpu->eval();
 
         vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
+
+        return 1;
     }
 
     // Работа только процессора [PPU эмулируется]
-    void tick_emulated()
+    int tick_emulated()
     {
-        int A = cpu->A, D = cpu->D, W = cpu->W, R = cpu->R, I;
-
-        // Запись или чтение в память
-        if (W) { write(A, D); } I = read(A);
-
-        // DMA запись
-        if (A == 0x4014 && W) {
-
-            for (int i = 0; i < 256; i++) {
-                oam[i] = read(D*256 + i);
-            }
-
-            _ppu_dm = 255;
-        }
-        // Джойстики 1 и 2
-        else if (A == 0x4016) {
-
-            if (W) {
-
-                // Защелка
-                if (_ppu_j0 == 1 && (D & 1) == 0) {
-                    _ppu_j1 = joy1 | 0x800;
-                    _ppu_j2 = joy2 | 0x800;
-                }
-
-                _ppu_j0 = D & 1;
-
-            } else if (R) {
-
-                I = (_ppu_j1 & 1) | 0x40;
-
-                _ppu_j1 >>= 1;
-                _ppu_j2 >>= 1;
-            }
-        }
-        // Запись или чтение в видеорегистры
-        else if (A >= 0x2000 && A <= 0x3FFF) {
-
-            switch (A & 7) {
-
-                // #2000 CTRL0
-                case 0: {
-
-                    if (W) {
-                        _ppu_c0 = D;
-                        _ppu_t  = (_ppu_t & 0xF3FF) | ((D & 3) << 10); // Биты 11..10 в t
-                    } else if (R) {
-                        I = _ppu_c0;
-                    }
-
-                    break;
-                }
-
-                // #2001 CTRL1
-                case 1: if (W) _ppu_c1 = D; else if (R) I = _ppu_c1; break;
-
-                // #2002 STATUS
-                case 2: {
-
-                    if (R) {
-
-                        I = (_ppu_vs << 7) | (_ppu_zh << 6) | (_ppu_ov << 5) | 0x10;
-
-                        _ppu_vs = 0;
-                        _ppu_zh = 0;
-                        _ppu_w  = 0;
-                    }
-
-                    break;
-                }
-
-                // #2003 SPRITE_ADDR
-                case 3: if (W) _ppu_sa = D; break;
-
-                // #2004 SPRITE DATA
-                case 4: {
-
-                    if (W) {
-                        oam[_ppu_sa] = _ppu_sd;
-                    } else if (R) {
-                        I = oam[_ppu_sa];
-                    }
-
-                    _ppu_sa = (_ppu_sa + 1) & 1;
-                    break;
-                }
-
-                // #2005 SCROLL
-                case 5: {
-
-                    if (W) {
-
-                        if (_ppu_w == 0) {
-                            _ppu_ff = D & 7; // FineX
-                            _ppu_t  = (_ppu_t & 0xFFE0) | ((D & 0xF8) >> 3); // CoarseX  D[7:3] -> T[4:0]
-                        } else {
-                            _ppu_t  = (_ppu_t & 0x8FFF) | ((D & 3) << 12);   // FineY:   D[2:0] -> T[14:12]
-                            _ppu_t  = (_ppu_t & 0xFC1F) | ((D & 0xF8) << 2); // CoarseY: D[7:3] -> T[9:5]
-
-                        }
-
-                        _ppu_w ^= 1;
-                    }
-
-                    break;
-                }
-
-                // #2006 PPU ADDRESS
-                case 6: {
-
-                    if (W) {
-
-                        if (_ppu_w == 0) {
-
-                            _ppu_va = (_ppu_va & 0x00FF) | ((D & 0x7F) << 8); // D[6:0] -> VA[14:8]
-                            _ppu_t  = (_ppu_t  & 0x00FF) | ((D & 0x3F) << 8); // D[5:0] -> T[13:8]; T[14] = 0
-
-                        } else {
-
-                            _ppu_va = (_ppu_va & 0xFF00) | (D & 0xFF); // D[7:0] -> VA[7:0]
-                            _ppu_t  = (_ppu_t  & 0xFF00) | (D & 0xFF); // D[7:0] -> T[7:0]
-                            _ppu_v  = _ppu_t;
-                        }
-
-                        _ppu_w ^= 1;
-                    }
-
-                    break;
-                }
-
-                // #2007 PPU DATA
-                case 7: {
-
-                    if (W) {
-
-                        if (_ppu_va >= 0x3F00 && _ppu_va < 0x3F20) {
-                            _ppu_pa[_ppu_va - 0x3F00] = D;
-                        } else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
-                            videom[(_ppu_va & vmemsize) + 0x2000] = D;
-                        }
-
-                    } else if (R) {
-
-                        // PALETTE
-                        if (_ppu_va >= 0x3F00 && _ppu_va < 0x3F20) {
-                            I = _ppu_pa[_ppu_va - 0x3F00];
-                        }
-                        // VIDEO MEMORY
-                        else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
-
-                            I = _ppu_ch;
-                            _ppu_ch = videom[(_ppu_va & vmemsize) + 0x2000];
-                        }
-                        // CHR-ROM
-                        else if (_ppu_va < 0x2000) {
-                            I = _ppu_ch;
-                            _ppu_ch = videom[_ppu_va];
-                        }
-                    }
-
-                    _ppu_va += (_ppu_c0 & 4 ? 32 : 1);
-                    _ppu_va &= 0x3FFF;
-                    break;
-                }
-            }
-        }
-
-        cpu->I  = I;
-        cpu->ce = (_ppu_dm == 0) ? 1 : 0;
+        int A, D, W, R, I;
+        int cycles = 1;
 
         // Уменьшать DMA циклы
-        if (_ppu_dm) _ppu_dm--;
+        if (_ppu_dm > 0) _ppu_dm--;
 
-        debug();
+        // Эмулятор процессора
+        if (PPU_MODEL == 2) {
 
-        // Временно отключить
-        // cpu->clock = 0; cpu->eval();
-        // cpu->clock = 1; cpu->eval();
+            debug();
+            cycles = step();
+
+        } else {
+
+            A = cpu->A;
+            D = cpu->D;
+            W = cpu->W;
+            R = cpu->R;
+
+            // Запись или чтение в память
+            if (W) { write(A, D); } I = read(A);
+
+            // Операция чтения или записи в PPU
+            I = eppu_rw(A, I, R, W, D);
+
+            cpu->I  = I;
+            cpu->ce = (_ppu_dm == 0) ? 1 : 0;
+
+            debug();
+            cpu->clock = 0; cpu->eval();
+            cpu->clock = 1; cpu->eval();
+        }
 
         // Обработка 3Т эмулятора PPU
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3 * cycles; i++) {
 
             int c;
             int nt = _ppu_v & 0xC00;        // Nametable [11:10]
@@ -627,9 +747,10 @@ public:
                         int sp_a  = (sp_y & 7) + (_ppu_c0 & 8 ? 0x1000 : 0);
                         int sp_pl = (sp_at & 3);
 
-                        if (_ppu_c0 & 0x20) { // 16x8
+                        // 16x8 или 8x8
+                        if (_ppu_c0 & 0x20) {
                             sp_a += ((sp_ch & 0xFE) << 4) + (sp_y & 8 ? 16 : 0);
-                        } else { // 8x8
+                        } else {
                             sp_a += (sp_ch << 4);
                         }
 
@@ -643,7 +764,17 @@ public:
                             int sp_cc = ((sp_pp >> kx) & 1) | 2*((sp_pp >> (8 + kx) & 1));
 
                             if (sp_cc) {
-                                _ppu_bg[sp_x + k] = 16 + 4*sp_pl + sp_cc;
+
+                                int bk = _ppu_bg[sp_x + k];
+                                int fr = sp_at & 0x20 ? 1 : 0;
+
+                                // Спрайт за фоном или перед фоном
+                                if (fr && (bk & 0b10011 == 0) || !fr) {
+                                    _ppu_bg[sp_x + k] = 16 + 4*sp_pl + sp_cc;
+                                }
+
+                                // Достигнут Sprite0Hit
+                                if (j == 0) _ppu_zh = 1;
                             }
                         }
 
@@ -653,23 +784,40 @@ public:
 
                 }
 
-                // Отрисовка линии
-                for (int j = 0; j < 256; j++) {
+                // Только на видимой области
+                if (_ppu_py < 240) {
 
-                    int c = palette[_ppu_pa[ _ppu_bg[j] ]];
-                    pset(64 + 2*j, 2*_ppu_py,   c); pset(65 + 2*j, 2*_ppu_py,   c);
-                    pset(64 + 2*j, 2*_ppu_py+1, c); pset(65 + 2*j, 2*_ppu_py+1, c);
+                    // Отрисовка линии
+                    for (int j = 0; j < 256; j++) {
+
+                        int c = palette[_ppu_pa[ _ppu_bg[j] ]];
+                        pset(64 + 2*j, 2*_ppu_py,   c); pset(65 + 2*j, 2*_ppu_py,   c);
+                        pset(64 + 2*j, 2*_ppu_py+1, c); pset(65 + 2*j, 2*_ppu_py+1, c);
+                    }
+
+                    // Бордер
+                    for (int j = 0; j < 64; j++) {
+
+                        pset(j, 2*_ppu_py,   palette[_ppu_pa[0]]);
+                        pset(j, 2*_ppu_py+1, palette[_ppu_pa[0]]);
+
+                        pset(j + 512+64, 2*_ppu_py,   palette[_ppu_pa[0]]);
+                        pset(j + 512+64, 2*_ppu_py+1, palette[_ppu_pa[0]]);
+                    }
                 }
             }
 
-            // NMI
+            // NMI: Возникает на 240-й линии
             if (_ppu_px == 1 && _ppu_py == 241) {
-                _ppu_vs = 1;
 
-                // cpu->nmi = _ppu_c0 & 0x80 ? 1 : 0;
+                _ppu_vs = 1;
+                cpu->nmi = _ppu_c0 & 0x80 ? 1 : 0;
+
+                // NMI запрос для эмулятора
+                if (PPU_MODEL == 2 && cpu->nmi) nmi();
             }
 
-            // Последняя строчка кадра
+            // Последняя строчка кадра, NMI заканчивается на 260-й
             if (_ppu_px == 1 && _ppu_py == 260) {
 
                 // 14:11, 9:5 :: 0yyy u0YY YYY0 0000
@@ -691,6 +839,8 @@ public:
                 }
             }
         }
+
+        return cycles;
     }
 
     void debug()
@@ -705,23 +855,32 @@ public:
         }
 
         // Состояние ДО выполнения такта CPU
-        if (DEBUG1 && cpu->ce) {
+        if (DEBUG1) {
 
-            disam(cpu->A);
-            printf("%c%04X R-%02X %s%02X R:[%02X %02X %02X %02X] V:[%04X %c] %c %s\n",
-                (cpu->m0 ? '*' : ' '),
-                cpu->A,
-                cpu->I,
-                (cpu->W ? "W-" : "  "),
-                cpu->D,
-                // --
-                cpu->_a, cpu->_x, cpu->_y, cpu->_p,
-                //
-                ppu->vida,
-                (ppu->vidw ? '~' : ' '),
-                (cpu->nmi ? 'N' : ' '),
-                cpu->m0 ? ds : ""
-            );
+            if (PPU_MODEL == 2) {
+
+                disam(pc);
+                printf("%04X %s\n", pc, ds);
+
+            } else if (cpu->ce) {
+
+                disam(cpu->A);
+                printf("%c%04X R-%02X %s%02X R:[%02X %02X %02X %02X] V:[%04X %c] %c %s\n",
+                    (cpu->m0 ? '*' : ' '),
+                    cpu->A,
+                    cpu->I,
+                    (cpu->W ? "W-" : "  "),
+                    cpu->D,
+                    // --
+                    cpu->_a, cpu->_x, cpu->_y, cpu->_p,
+                    //
+                    ppu->vida,
+                    (ppu->vidw ? '~' : ' '),
+                    (cpu->nmi ? 'N' : ' '),
+                    cpu->m0 ? ds : ""
+                );
+            }
+
         }
     }
 
@@ -766,8 +925,11 @@ public:
 
                 for (int i = 0; i < 4096; i++) {
 
-                    if (PPU_MODEL) tick_emulated(); else tick();
-                    count++;
+                    // Ограничить количество тактов :: 107210
+                    if (count >= 107210) { SDL_Delay(1); break; }
+
+                    // Выполнить такт
+                    if (PPU_MODEL) count += tick_emulated(); else count += tick();
                 }
 
                 pticks = SDL_GetTicks();
@@ -861,5 +1023,815 @@ public:
             case REL: sprintf(ds, "%s $%04X",       OPTABLE[a1], a + 2 + (char)a2); break;
             case IND: sprintf(ds, "%s ($%04X)",     OPTABLE[a1], a2 + a3*256); break;
         }
+    }
+
+    // Эмулятор процессора
+    // -----------------------------------------------------------------
+
+    // Установка флагов
+    void set_zero(int x)      { reg_p = x ? (reg_p & 0xFD) : (reg_p | 0x02); }
+    void set_overflow(int x)  { reg_p = x ? (reg_p | 0x40) : (reg_p & 0xBF); }
+    void set_carry(int x)     { reg_p = x ? (reg_p | 0x01) : (reg_p & 0xFE); }
+    void set_decimal(int x)   { reg_p = x ? (reg_p | 0x08) : (reg_p & 0xF7); }
+    void set_break(int x)     { reg_p = x ? (reg_p | 0x10) : (reg_p & 0xEF); }
+    void set_interrupt(int x) { reg_p = x ? (reg_p | 0x04) : (reg_p & 0xFB); }
+    void set_sign(int x)      { reg_p = !!(x & 0x80) ? (reg_p | 0x80) : (reg_p & 0x7F); };
+
+    // Получение значений флагов
+    int if_carry()      { return !!(reg_p & 0x01); }
+    int if_zero()       { return !!(reg_p & 0x02); }
+    int if_interrupt()  { return !!(reg_p & 0x04); }
+    int if_overflow()   { return !!(reg_p & 0x40); }
+    int if_sign()       { return !!(reg_p & 0x80); }
+
+    // Работа со стеком
+    void push(int x) { write(0x100 + reg_s, x & 0xff); reg_s = ((reg_s - 1) & 0xff); }
+    int pull()       { reg_s = (reg_s + 1) & 0xff; return read(0x100 + reg_s); }
+
+    // Чтение слова
+    uint16_t readw(int addr) {
+
+        int l = read(addr);
+        int h = read(addr+1);
+        return 256*h + l;
+    }
+
+    // Получение эффективного адреса
+    int effective(int addr)
+    {
+        int opcode, iaddr;
+        int tmp, rt, pt;
+
+        // Чтение опкода
+        opcode = read(addr++);
+
+        // Чтобы адрес не вышел за пределы
+        addr &= 0xffff;
+
+        // Разобрать операнд
+        switch (operand_types[ opcode ]) {
+
+            // PEEK( PEEK( (arg + X) % 256) + PEEK((arg + X + 1) % 256) * 256
+            // Indirect, X (b8,X)
+            case NDX: {
+
+                tmp = read( addr );
+                tmp = (tmp + reg_x) & 0xff;
+                return read(tmp) + ((read((1 + tmp) & 0xff) << 8));
+            }
+
+            // Indirect, Y (b8),Y
+            case NDY: {
+
+                tmp = read(addr);
+                rt  = read(0xff & tmp);
+                rt |= read(0xff & (tmp + 1)) << 8;
+                pt  = rt;
+                rt  = (rt + reg_y) & 0xffff;
+
+                if ((pt & 0xff00) != (rt & 0xff00))
+                    cycles_ext++;
+
+                return rt;
+            }
+
+            // Zero Page
+            case ZP:  return read( addr );
+
+            // Zero Page, X
+            case ZPX: return (read(addr) + reg_x) & 0x00ff;
+
+            // Zero Page, Y
+            case ZPY: return (read(addr) + reg_y) & 0x00ff;
+
+            // Absolute
+            case ABS: return readw(addr);
+
+            // Absolute, X
+            case ABX: {
+
+                pt = readw(addr);
+                rt = pt + reg_x;
+
+                if ((pt & 0xff00) != (rt & 0xff00))
+                    cycles_ext++;
+
+                return rt & 0xffff;
+            }
+
+            // Absolute, Y
+            case ABY: {
+
+                pt = readw(addr);
+                rt = pt + reg_y;
+
+                if ((pt & 0xff00) != (rt & 0xff00))
+                    cycles_ext++;
+
+                return rt & 0xffff;
+            }
+
+            // Indirect
+            case IND: {
+
+                addr  = readw(addr);
+                iaddr = read(addr) + 256*read((addr & 0xFF00) + ((addr + 1) & 0x00FF));
+                return iaddr;
+            }
+
+            // Relative
+            case REL: {
+
+                iaddr = read(addr);
+                return (iaddr + addr + 1 + (iaddr < 128 ? 0 : -256)) & 0xffff;
+            }
+        }
+
+        return -1;
+    }
+
+    // Вычисление количества cycles для branch
+    int branch(int addr, int iaddr)
+    {
+        if ((addr & 0xff00) != (iaddr & 0xff00)) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    // Вызов прерывания
+    void brk()
+    {
+        push((pc >> 8) & 0xff);         // Вставка обратного адреса в стек
+        push(pc & 0xff);
+        set_break(1);                   // Установить BFlag перед вставкой
+        reg_p |= 0b00100000;            // 1
+        push(reg_p);
+        set_interrupt(1);
+    }
+
+    // Немаскируемое прерывание
+    void nmi()
+    {
+        push((pc >> 8) & 0xff);         // Вставка обратного адреса в стек
+        push(pc & 0xff);
+        set_break(1);                   // Установить BFlag перед вставкой
+        reg_p |= 0b00100000;            // 1
+        push(reg_p);
+        set_interrupt(1);
+        pc = readw(0xFFFA);
+    }
+
+    // Исполнение шага инструкции
+    int step()
+    {
+        int temp, optype, opname, src = 0;
+        int addr = pc, opcode;
+        int cycles_per_instr = 0;
+
+        int ppurd = 1;
+        int ppuwr = 0;
+
+        // Доп. циклы разбора адреса
+        cycles_ext = 0;
+
+        // Определение эффективного адреса
+        int iaddr = effective(addr);
+
+        // Прочесть информацию по опкодам
+        opcode = read(addr);
+        optype = operand_types[ opcode ];
+        opname = opcode_names [ opcode ];
+
+        // Эти инструкции НЕ ДОЛЖНЫ читать что-либо из памяти перед записью
+        if (opname == STA || opname == STX || opname == STY) {
+            ppurd = 0;
+        }
+
+        // Инкремент адреса при чтении опкода
+        addr = (addr + 1) & 0xffff;
+
+        // Базовые циклы + доп. циклы
+        cycles_per_instr = cycles_basic[ opcode ] + cycles_ext;
+
+        // --------------------------------
+        // Чтение операнда из памяти
+        // --------------------------------
+
+        switch (optype) {
+
+            case ___: return 0;
+            case NDX: // Indirect X (b8,X)
+            case NDY: // Indirect, Y
+            case ZP:  // Zero Page
+            case ZPX: // Zero Page, X
+            case ZPY: // Zero Page, Y
+            case REL: // Relative
+
+                addr = (addr + 1) & 0xffff;
+                if (ppurd) src = read(iaddr);
+                break;
+
+            case ABS: // Absolute
+            case ABX: // Absolute, X
+            case ABY: // Absolute, Y
+            case IND: // Indirect
+
+                addr = (addr + 2) & 0xffff;
+                if (ppurd) src = read(iaddr);
+                break;
+
+            case IMM: // Immediate
+
+                if (ppurd) src = read(addr);
+                addr = (addr + 1) & 0xffff;
+                break;
+
+            case ACC: // Accumulator source
+
+                src = reg_a;
+                break;
+        }
+
+        // --------------------------------
+        // Разбор инструкции и исполнение
+        // --------------------------------
+
+        switch (opname) {
+
+            // Сложение с учетом переноса
+            case ADC: {
+
+                temp = src + reg_a + (reg_p & 1);
+                set_zero(temp & 0xff);
+                set_sign(temp);
+                set_overflow(((reg_a ^ src ^ 0x80) & 0x80) && ((reg_a ^ temp) & 0x80) );
+                set_carry(temp > 0xff);
+                reg_a = temp & 0xff;
+                break;
+            }
+
+            // Логическое умножение
+            case AND: {
+
+                src &= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                break;
+            }
+
+            // Логический сдвиг вправо
+            case ASL: {
+
+                set_carry(src & 0x80);
+
+                src <<= 1;
+                src &= 0xff;
+                set_sign(src);
+                set_zero(src);
+
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+                break;
+            }
+
+            // Условные переходы
+            case BCC: if (!if_carry())    { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BCS: if ( if_carry())    { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BNE: if (!if_zero())     { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BEQ: if ( if_zero())     { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BPL: if (!if_sign())     { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BMI: if ( if_sign())     { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BVC: if (!if_overflow()) { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+            case BVS: if ( if_overflow()) { cycles_per_instr += branch(addr, iaddr); addr = iaddr; } break;
+
+            // Копировать бит 6 в OVERFLOW флаг
+            case BIT: {
+
+                set_sign(src);
+                set_overflow(0x40 & src);
+                set_zero(src & reg_a);
+                break;
+            }
+
+            // Программное прерывание
+            case BRK: {
+
+                pc = (pc + 2) & 0xffff;
+                brk();
+                addr = readw(0xFFFE);
+                break;
+            }
+
+            /* Флаги */
+            case CLC: set_carry(0);     break;
+            case SEC: set_carry(1);     break;
+            case CLD: set_decimal(0);   break;
+            case SED: set_decimal(1);   break;
+            case CLI: set_interrupt(0); break;
+            case SEI: set_interrupt(1); break;
+            case CLV: set_overflow(0);  break;
+
+            /* Сравнение A, X, Y с операндом */
+            case CMP:
+            case CPX:
+            case CPY: {
+
+                src = (opname == CMP ? reg_a : (opname == CPX ? reg_x : reg_y)) - src;
+                set_carry(src >= 0);
+                set_sign(src);
+                set_zero(src & 0xff);
+                break;
+            }
+
+            /* Уменьшение операнда на единицу */
+            case DEC: {
+
+                src = (src - 1) & 0xff;
+                set_sign(src);
+                set_zero(src);
+                write(iaddr, src);
+                break;
+            }
+
+            /* Уменьшение X на единицу */
+            case DEX: {
+
+                reg_x = (reg_x - 1) & 0xff;
+                set_sign(reg_x);
+                set_zero(reg_x);
+                break;
+            }
+
+            /* Уменьшение Y на единицу */
+            case DEY: {
+
+                reg_y = (reg_y - 1) & 0xff;
+                set_sign(reg_y);
+                set_zero(reg_y);
+                break;
+            }
+
+            /* Исключающее ИЛИ */
+            case EOR: {
+
+                src ^= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                break;
+            }
+
+            /* Увеличение операнда на единицу */
+            case INC: {
+
+                src = (src + 1) & 0xff;
+                set_sign(src);
+                set_zero(src);
+                write(iaddr, src);
+                break;
+            }
+
+            /* Уменьшение X на единицу */
+            case INX: {
+
+                reg_x = (reg_x + 1) & 0xff;
+                set_sign(reg_x);
+                set_zero(reg_x);
+                break;
+            }
+
+            /* Увеличение Y на единицу */
+            case INY: {
+
+                reg_y = (reg_y + 1) & 0xff;
+                set_sign(reg_y);
+                set_zero(reg_y);
+                break;
+            }
+
+            /* Переход по адресу */
+            case JMP: addr = iaddr; break;
+
+            /* Вызов подпрограммы */
+            case JSR: {
+
+                addr = (addr - 1) & 0xffff;
+                push((addr >> 8) & 0xff);   /* Вставка обратного адреса в стек (-1) */
+                push(addr & 0xff);
+                addr = iaddr;
+                break;
+            }
+
+            /* Загрузка операнда в аккумулятор */
+            case LDA: {
+
+                set_sign(src);
+                set_zero(src);
+                reg_a = (src);
+                break;
+            }
+
+            /* Загрузка операнда в X */
+            case LDX: {
+
+                set_sign(src);
+                set_zero(src);
+                reg_x = (src);
+                break;
+            }
+
+            /* Загрузка операнда в Y */
+            case LDY: {
+
+                set_sign(src);
+                set_zero(src);
+                reg_y = (src);
+                break;
+            }
+
+            /* Логический сдвиг вправо */
+            case LSR: {
+
+                set_carry(src & 0x01);
+                src >>= 1;
+                set_sign(src);
+                set_zero(src);
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+                break;
+            }
+
+            /* Логическое побитовое ИЛИ */
+            case ORA: {
+
+                src |= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                break;
+            }
+
+            /* Стек */
+            case PHA: push(reg_a); break;
+            case PHP: push((reg_p | 0x30)); break;
+            case PLP: reg_p = pull(); break;
+
+            /* Извлечение из стека в A */
+            case PLA: {
+
+                src = pull();
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                break;
+            }
+
+            /* Циклический сдвиг влево */
+            case ROL: {
+
+                src <<= 1;
+                if (if_carry()) src |= 0x1;
+                set_carry(src > 0xff);
+
+                src &= 0xff;
+                set_sign(src);
+                set_zero(src);
+
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+                break;
+            }
+
+            /* Циклический сдвиг вправо */
+            case ROR: {
+
+                if (if_carry()) src |= 0x100;
+                set_carry(src & 0x01);
+
+                src >>= 1;
+                set_sign(src);
+                set_zero(src);
+
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+                break;
+            }
+
+            /* Возврат из прерывания */
+            case RTI: {
+
+                reg_p = pull();
+                src   = pull();
+                src  |= (pull() << 8);
+                addr  = src;
+                break;
+            }
+
+            /* Возврат из подпрограммы */
+            case RTS: {
+
+                src  = pull();
+                src += ((pull()) << 8) + 1;
+                addr = (src);
+                break;
+            }
+
+            /* Вычитание */
+            case SBC: {
+
+                temp = reg_a - src - (if_carry() ? 0 : 1);
+
+                set_sign(temp);
+                set_zero(temp & 0xff);
+                set_overflow(((reg_a ^ temp) & 0x80) && ((reg_a ^ src) & 0x80));
+                set_carry(temp >= 0);
+                reg_a = (temp & 0xff);
+                break;
+            }
+
+            /* Запись содержимого A,X,Y в память */
+            case STA: write(iaddr, reg_a); break;
+            case STX: write(iaddr, reg_x); break;
+            case STY: write(iaddr, reg_y); break;
+
+            /* Пересылка содержимого аккумулятора в регистр X */
+            case TAX: {
+
+                src = reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_x = (src);
+                break;
+            }
+
+            /* Пересылка содержимого аккумулятора в регистр Y */
+            case TAY: {
+
+                src = reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_y = (src);
+                break;
+            }
+
+            /* Пересылка содержимого S в регистр X */
+            case TSX: {
+
+                src = reg_s;
+                set_sign(src);
+                set_zero(src);
+                reg_x = (src);
+                break;
+            }
+
+            /* Пересылка содержимого X в регистр A */
+            case TXA: {
+
+                src = reg_x;
+                set_sign(src);
+                set_zero(src);
+                reg_a = (src);
+                break;
+            }
+
+            /* Пересылка содержимого X в регистр S */
+            case TXS: reg_s = reg_x; break;
+
+            /* Пересылка содержимого Y в регистр A */
+            case TYA: {
+
+                src = reg_y;
+                set_sign(src);
+                set_zero(src);
+                reg_a = (src);
+                break;
+            }
+
+            // -------------------------------------------------------------
+            // Недокументированные инструкции
+            // -------------------------------------------------------------
+
+            case SLO: {
+
+                /* ASL */
+                set_carry(src & 0x80);
+                src <<= 1;
+                src &= 0xff;
+                set_sign(src);
+                set_zero(src);
+
+                if (optype == ACC) reg_a = src;
+                else write(iaddr, src);
+
+                /* ORA */
+                src |= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                break;
+            }
+
+            case RLA: {
+
+                /* ROL */
+                src <<= 1;
+                if (if_carry()) src |= 0x1;
+                set_carry(src > 0xff);
+                src &= 0xff;
+                set_sign(src);
+                set_zero(src);
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+
+                /* AND */
+                src &= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                break;
+            }
+
+            case RRA: {
+
+                /* ROR */
+                if (if_carry()) src |= 0x100;
+                set_carry(src & 0x01);
+                src >>= 1;
+                set_sign(src);
+                set_zero(src);
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+
+                /* ADC */
+                temp = src + reg_a + (reg_p & 1);
+                set_zero(temp & 0xff);
+                set_sign(temp);
+                set_overflow(((reg_a ^ src ^ 0x80) & 0x80) && ((reg_a ^ temp) & 0x80) );
+                set_carry(temp > 0xff);
+                reg_a = temp & 0xff;
+                break;
+
+            }
+
+            case SRE: {
+
+                /* LSR */
+                set_carry(src & 0x01);
+                src >>= 1;
+                set_sign(src);
+                set_zero(src);
+                if (optype == ACC) reg_a = src; else write(iaddr, src);
+
+                /* EOR */
+                src ^= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+
+                break;
+            }
+
+            case DCP: {
+
+                /* DEC */
+                src = (src - 1) & 0xff;
+                set_sign(src);
+                set_zero(src);
+                write(iaddr, src);
+
+                /* CMP */
+                src = reg_a - src;
+                set_carry(src >= 0);
+                set_sign(src);
+                set_zero(src & 0xff);
+                break;
+            }
+
+            // Увеличить на +1 и вычесть из A полученное значение
+            case ISC: {
+
+                /* INC */
+                src = (src + 1) & 0xff;
+                set_sign(src);
+                set_zero(src);
+                write(iaddr, src);
+
+                /* SBC */
+                temp = reg_a - src - (if_carry() ? 0 : 1);
+
+                set_sign(temp);
+                set_zero(temp & 0xff);
+                set_overflow(((reg_a ^ temp) & 0x80) && ((reg_a ^ src) & 0x80));
+                set_carry(temp >= 0);
+                reg_a = (temp & 0xff);
+                break;
+            }
+
+            // A,X = src
+            case LAX: {
+
+                reg_a = (src);
+                set_sign(src);
+                set_zero(src);
+                reg_x = (src);
+                break;
+            }
+
+            case AAX: write(iaddr, reg_a & reg_x); break;
+
+            // AND + Carry
+            case AAC: {
+
+                /* AND */
+                src &= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+
+                /* Carry */
+                set_carry(reg_a & 0x80);
+                break;
+            }
+
+            case ASR: {
+
+                /* AND */
+                src &= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+
+                /* LSR A */
+                set_carry(reg_a & 0x01);
+                reg_a >>= 1;
+                set_sign(reg_a);
+                set_zero(reg_a);
+                break;
+            }
+
+            case ARR: {
+
+                /* AND */
+                src &= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+
+                /* P[6] = A[6] ^ A[7]: Переполнение */
+                set_overflow((reg_a ^ (reg_a >> 1)) & 0x40);
+
+                temp = (reg_a >> 7) & 1;
+                reg_a >>= 1;
+                reg_a |= (reg_p & 1) << 7;
+
+                set_carry(temp);
+                set_sign(reg_a);
+                set_zero(reg_a);
+                break;
+            }
+
+            case ATX: {
+
+                reg_a |= 0xFF;
+
+                /* AND */
+                src &= reg_a;
+                set_sign(src);
+                set_zero(src);
+                reg_a = src;
+                reg_x = reg_a;
+                break;
+
+            }
+
+            case AXS: {
+
+                temp = (reg_a & reg_x) - src;
+                set_sign(temp);
+                set_zero(temp);
+                set_carry(((temp >> 8) & 1) ^ 1);
+                reg_x = temp;
+                break;
+            }
+
+            // Работает правильно, а тесты все равно не проходят эти 2
+            case SYA: {
+
+                temp = read(pc + 2);
+                temp = ((temp + 1) & reg_y);
+                write(iaddr, temp & 0xff);
+                break;
+            }
+
+            case SXA: {
+
+                temp = read(pc + 2);
+                temp = ((temp + 1) & reg_x);
+                write(iaddr, temp & 0xff);
+                break;
+            }
+        }
+
+        // Установка нового адреса
+        pc = addr;
+
+        return cycles_per_instr;
     }
 };

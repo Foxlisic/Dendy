@@ -616,8 +616,8 @@ begin
                             if (cpu_w) begin
 
                                 // $3F00-$3F1F Палитры
-                                if      (va >= 16'h3F00 && va < 16'h3F10) bgpal[va[3:0]] <= cpu_o;
-                                else if (va >= 16'h3F10 && va < 16'h3F20) sppal[va[3:0]] <= cpu_o;
+                                if      (va >= 16'h3F00 && va < 16'h3F10) begin bgpal[va[3:0]] <= cpu_o; vidch <= cpu_o; end
+                                else if (va >= 16'h3F10 && va < 16'h3F20) begin sppal[va[3:0]] <= cpu_o; vidch <= cpu_o; end
                                 else vidw <= 1;
 
                                 vida <= va;
