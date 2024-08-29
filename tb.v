@@ -79,17 +79,18 @@ ppu DendyPPU
     .chra       (chra),
     .chrd       (chrd),
     // ---
-    .oama       (oama),
-    .oamd       (oamd),
-    .oam2a      (oam2a),
-    .oam2i      (oam2i),
-    .oam2o      (oam2o),
-    .oam2w      (oam2w),
-    // ---
     .vida       (vida),
     .vidi       (vidi),
     .vido       (vido),
     .vidw       (vidw),
+    // ---
+    .oama       (oama),
+    .oamd       (oamd),
+    // ---
+    .oam2a      (oam2a),
+    .oam2i      (oam2i),
+    .oam2o      (oam2o),
+    .oam2w      (oam2w),
     // -- Память PRG --
     .prga       (prga),
     .prgi       (prgi),

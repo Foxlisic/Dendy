@@ -3,7 +3,7 @@
 switch ($argv[1])
 {
     // Для тестов DE0
-    case 'nes':
+    case 'test':
 
         $in      = $argv[2];
         $data    = file_get_contents(glob("$in*.nes")[0]);

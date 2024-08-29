@@ -241,7 +241,7 @@ begin
 
     //               4
     ctrl0   <= 8'b0001_0000;
-    ctrl1   <= 8'b0000_1110;
+    ctrl1   <= 8'b0001_1110;
 
     // Палитра фона
     bgpal[ 0] <= 6'h0F; bgpal[ 1] <= 6'h16; bgpal[ 2] <= 6'h30; bgpal[ 3] <= 6'h38;
@@ -621,15 +621,15 @@ begin
                                     if (va[4]) sppal[va[3:0]] <= cpu_o;
                                     else       bgpal[va[3:0]] <= cpu_o;
 
-                                    vidch <= cpu_o;
-
                                 end else begin
 
                                     vida <= va;
                                     vido <= cpu_o;
-                                    vidw <= 1;
+                                    vidw <= (va >= 16'h2000 && va < 16'h3F00);
 
                                 end
+
+                                vidch <= cpu_o;
 
                             end else if (cpu_r) begin
 

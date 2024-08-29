@@ -82,16 +82,6 @@ assign HEX3 = 7'b1111111;
 assign HEX4 = 7'b1111111;
 assign HEX5 = 7'b1111111;
 
-// Провода
-// --------------------------------------------------------------
-wire [7:0]  x2a, x2i, x2o, oama, oamd;
-wire [7:0]  chr_i, vrm_i;
-wire        x2w;
-
-// Чтение [CHR или vrm]
-wire [13:0] chra;
-wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vrm_i : 8'hFF);
-
 // Генератор частот
 // --------------------------------------------------------------
 
@@ -107,6 +97,38 @@ pll PLL0
     .locked     (locked)
 );
 
+// Маппер
+// --------------------------------------------------------------
+
+wire [7:0]  x2a, x2i, x2o, oama, oamd;
+wire [7:0]  chr_i, vrm_i;
+wire        x2w;
+
+// Чтение [CHR или VRAM]
+wire [ 7:0] prg_in;
+wire [ 7:0] ram_in;
+wire [13:0] chra;
+wire [15:0] prga;
+wire [ 7:0] oam2a, oam2i, oam2o, vidi, vidp, prgd;
+wire        oam2w, vidw, prgw, ce_cpu, nmi;
+wire [14:0] vida;
+
+// Может переключаться маппером
+wire [16:0] prg_address = prga[14:0];
+
+// Выбор источника памяти
+wire        w_rom = (prgi >= 16'h8000);
+wire        w_ram = (prgi <  16'h2000);
+wire [ 7:0] prgi =
+    w_rom ? prg_in :
+    w_ram ? ram_in :
+            8'hFF;
+
+// Для видеоадаптера
+wire [7:0]  chrd =
+    chra < 14'h2000 ? chr_i :
+    chra < 14'h3F00 ? vrm_i : 8'hFF;
+
 // PPU Pixel Processing Unix
 // --------------------------------------------------------------
 
@@ -114,37 +136,63 @@ ppu DendyPPU
 (
     .clock25    (clock_25),
     .reset_n    (locked),
+    .ce_cpu     (ce_cpu),
+    .nmi        (nmi),
     // -- Физический интерфейс --
     .r          (VGA_R),
     .g          (VGA_G),
     .b          (VGA_B),
     .hs         (VGA_HS),
     .vs         (VGA_VS),
-    // -- Подключение к памяти --
+    // -- Удвоение 2Y --
     .x2a        (x2a),
     .x2i        (x2i),
     .x2o        (x2o),
     .x2w        (x2w),
-    .oama       (oama),
-    .oamd       (oamd),
+    // -- CHR-ROM --
     .chra       (chra),
     .chrd       (chrd),
+    // -- OAM --
+    .oama       (oama),
+    .oamd       (oamd),
+    .oam2a      (oam2a),
+    .oam2i      (oam2i),
+    .oam2o      (oam2o),
+    .oam2w      (oam2w),
+    // -- VIDEO --
+    .vida       (vida),
+    .vidi       (vidi),
+    .vido       (vido),
+    .vidw       (vidw),
+    // -- PROGRAM --
+    .prga       (prga),
+    .prgi       (prgi),
+    .prgd       (prgd),
+    .prgw       (prgw),
 );
 
 // Подключение модулей памяти
 // --------------------------------------------------------------
 
-// Для хранения сканлайна
-mem_x2 MemoryDoubleVGA
+// 2K RAM
+mem_ram DendyRAM
 (
     .clock      (clock_100),
-    .a          (x2a),
-    .q          (x2i),
-    .d          (x2o),
-    .w          (x2w),
+    .a          (prga[10:0]),
+    .d          (prgd),
+    .q          (ram_in),
+    .w          (prgw && w_ram),
 );
 
-// 8K для знакогенератора
+// 128K для памяти программ :: работает по мапперу
+mem_prg DendyPROGRAM
+(
+    .clock      (clock_100),
+    .a          (prg_address),
+    .q          (prg_in),
+);
+
+// 64K для знакогенератора [8k x 8]
 mem_chr DendyCHRROM
 (
     .clock      (clock_100),
@@ -158,6 +206,10 @@ mem_vrm DendyVideoRAM
     .clock      (clock_100),
     .a          (chra[10:0]),
     .q          (vrm_i),
+    .ax         (vida[10:0]),
+    .qx         (vidi),
+    .dx         (vido),
+    .wx         (vidw),
 );
 
 // 1K для символов спрайтов
@@ -166,6 +218,20 @@ mem_oam DendyOAM
     .clock      (clock_100),
     .a          (oama),
     .q          (oamd),
+    .ax         (oam2a),
+    .qx         (oam2i),
+    .dx         (oam2o),
+    .wx         (oam2w),
+);
+
+// 1K Для хранения сканлайна
+mem_x2 MemoryDoubleVGA
+(
+    .clock      (clock_100),
+    .a          (x2a),
+    .q          (x2i),
+    .d          (x2o),
+    .w          (x2w),
 );
 
 endmodule
