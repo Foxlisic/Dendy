@@ -386,7 +386,9 @@ begin
 
                 oam_st   <= oam_id == 7 ? 8 : 1;
                 oam_id   <= oam_id + 1;
-                oam_hit  <= {sp_chrd, sp[0][7:0]} && (oama == 4);
+
+                // Тест первого (0-го спрайта)
+                if (oama == 4 && {sp_chrd, sp[oam_id][7:0]}) oam_hit <= 1;
 
                 sp[oam_id][ 15:8] <= sp_chrd; // BGTop
 
