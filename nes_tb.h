@@ -13,8 +13,9 @@ protected:
     Uint32*             screen_buffer;
 
     // Обработка фрейма
-    int width, height, scale, frame_length, pticks;
-    int x, y, _hs, _vs, instr = 125000;
+    int         width, height, scale, frame_length, pticks;
+    int         x, y, _hs, _vs, instr = 125000;
+    int         tick_count = 0;
 
     uint8_t*    videom;
     uint8_t*    chrrom;

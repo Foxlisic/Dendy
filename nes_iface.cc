@@ -48,6 +48,8 @@ void TB::write(uint16_t A, uint8_t D)
 // 1 Такт CPU + PPU обвязка + VGA
 int TB::tick()
 {
+    tick_count++;
+
     // 0xFFF
     int vmemsize = 0x7FF;
 

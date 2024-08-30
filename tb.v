@@ -101,7 +101,8 @@ ppu DendyPPU
     .cpu_i      (I),
     .cpu_o      (D),
     .cpu_w      (W),
-    .cpu_r      (R)
+    .cpu_r      (R),
+    .joy1       (8'hAF)
 );
 
 endmodule
