@@ -103,8 +103,6 @@ pll PLL0
 wire [11:0] joy1;
 wire [11:0] joy2;
 
-assign LEDR = joy1[9:0];
-
 joy SegaJoy1
 (
     .clock      (clock_25),

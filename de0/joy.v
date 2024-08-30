@@ -18,15 +18,16 @@ reg [3:0] i;
 always @(posedge clock)
 if (t == 499) begin
 
-    // 16 x 20 = 320 мкс обновление
     case (i)
+    // Основной набор A,B [C-Select] Start, Управление
     0:   begin pin_d7 <= 1'b1; end
-    1:   begin pin_d7 <= 1'b0; {joy[8:4], joy[0]} <= {/*C*/  pin_d9, /*R*/ pin_d4, /*L*/ pin_d3, /*D*/ pin_d2, /*U*/ pin_d1, /*B*/ pin_d6}; end
-    2:   begin pin_d7 <= 1'b1; {joy[3],   joy[1]} <= {/*ST*/ pin_d9, /*A*/ pin_d6}; end
-    3,5: begin pin_d7 <= 1'b0; end
-    4,6: begin pin_d7 <= 1'b1; end
-    7:   begin pin_d7 <= 1'b0; {joy[11:9], joy[2]} <= {pin_d3, pin_d2, pin_d1, /*M*/ pin_d4}; end
-    8:   begin pin_d7 <= 1'b1; end
+    2:   begin pin_d7 <= 1'b0; {joy[7:4], joy[2], joy[0]} <= {/*R*/  pin_d4, /*L*/ pin_d3, /*D*/ pin_d2, /*U*/ pin_d1, /*С*/ pin_d9,  /*B*/ pin_d6}; end
+    4:   begin pin_d7 <= 1'b1; {          joy[3], joy[1]} <= {/*ST*/ pin_d9, /*A*/ pin_d6}; end
+    // Дополнительный набор MODE, X, Y, Z
+    5,7: begin pin_d7 <= 1'b0; end
+    6,8: begin pin_d7 <= 1'b1; end
+    10:  begin pin_d7 <= 1'b0; joy[11:8] <= {pin_d3, pin_d2, pin_d1, /*M*/ pin_d4}; end
+    11:  begin pin_d7 <= 1'b1; end
     endcase
 
     i <= i + 1;
