@@ -2,6 +2,21 @@
 
 switch ($argv[1])
 {
+    // Подготовка MIF-файлов
+    case 'nes':
+
+        $in      = $argv[2];
+        $data    = file_get_contents(glob("$in*.nes")[0]);
+        $prg_num = ord($data[4]);
+        $chr_num = ord($data[5]);
+
+        $program = substr($data, 16,  $prg_num * 16384);
+        $chardat = substr($data, 16 + $prg_num * 16384, $chr_num * 8192);
+
+        file_put_contents("de0/mif_prg.mif", create_mif($program, $prg_num*16384));
+        file_put_contents("de0/mif_chr.mif", create_mif($chardat, 8192));
+        break;
+
     // Для тестов DE0
     case 'test':
 
@@ -15,9 +30,9 @@ switch ($argv[1])
         $charctr = substr($video, 0, 8192);
         $chardat = substr($video, 8192, 2048);
 
-        file_put_contents("de0/mem_chr.mif", create_mif($charctr, 8192));
-        file_put_contents("de0/mem_oam.mif", create_mif($oamdata));
-        file_put_contents("de0/mem_vrm.mif", create_mif($chardat));
+        file_put_contents("de0/mif_chr.mif", create_mif($charctr, 8192));
+        file_put_contents("de0/mif_oam.mif", create_mif($oamdata));
+        file_put_contents("de0/mif_vrm.mif", create_mif($chardat));
 
         break;
 }

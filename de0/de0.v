@@ -108,13 +108,15 @@ wire        x2w;
 wire [ 7:0] prg_in;
 wire [ 7:0] ram_in;
 wire [13:0] chra;
-wire [15:0] prga;
-wire [ 7:0] oam2a, oam2i, oam2o, vidi, vidp, prgd;
-wire        oam2w, vidw, prgw, ce_cpu, nmi;
+wire [15:0] prga, cpu_a;
+wire [ 7:0] oam2a, oam2i, oam2o, vidi, vidp, prgd, cpu_i, cpu_o;
+wire [ 7:0] joy1, joy2;
+wire        oam2w, vidw, prgw, ce_cpu, nmi, cpu_w, cpu_r;
 wire [14:0] vida;
 
 // Может переключаться маппером
-wire [16:0] prg_address = prga[14:0];
+// 14:0 - 32K, 13:0 - 16K ROM
+wire [16:0] prg_address = prga[13:0];
 
 // Выбор источника памяти
 wire        w_rom = (prgi >= 16'h8000);
@@ -129,8 +131,24 @@ wire [7:0]  chrd =
     chra < 14'h2000 ? chr_i :
     chra < 14'h3F00 ? vrm_i : 8'hFF;
 
+// CPU Central Processing Unix
+// ---------------------------------------------------------------------
+
+cpu DendyCPU
+(
+    .clock      (clock_25),
+    .reset_n    (locked),
+    .ce         (ce_cpu),
+    .nmi        (nmi),
+    .A          (cpu_a),
+    .I          (cpu_i),
+    .D          (cpu_o),
+    .R          (cpu_r),
+    .W          (cpu_w),
+);
+
 // PPU Pixel Processing Unix
-// --------------------------------------------------------------
+// ---------------------------------------------------------------------
 
 ppu DendyPPU
 (
@@ -138,17 +156,31 @@ ppu DendyPPU
     .reset_n    (locked),
     .ce_cpu     (ce_cpu),
     .nmi        (nmi),
-    // -- Физический интерфейс --
+    // -- VGA --
     .r          (VGA_R),
     .g          (VGA_G),
     .b          (VGA_B),
     .hs         (VGA_HS),
     .vs         (VGA_VS),
-    // -- Удвоение 2Y --
-    .x2a        (x2a),
-    .x2i        (x2i),
-    .x2o        (x2o),
-    .x2w        (x2w),
+    // --- Процессор ---
+    .cpu_a      (cpu_a),
+    .cpu_i      (cpu_i),
+    .cpu_o      (cpu_o),
+    .cpu_r      (cpu_r),
+    .cpu_w      (cpu_w),
+    // --- Джойстики ---
+    .joy1       (joy1),
+    .joy2       (joy2),
+    // -- PROGRAM --
+    .prga       (prga),
+    .prgi       (prgi),
+    .prgd       (prgd),
+    .prgw       (prgw),
+    // -- VIDEO --
+    .vida       (vida),
+    .vidi       (vidi),
+    .vido       (vido),
+    .vidw       (vidw),
     // -- CHR-ROM --
     .chra       (chra),
     .chrd       (chrd),
@@ -159,20 +191,15 @@ ppu DendyPPU
     .oam2i      (oam2i),
     .oam2o      (oam2o),
     .oam2w      (oam2w),
-    // -- VIDEO --
-    .vida       (vida),
-    .vidi       (vidi),
-    .vido       (vido),
-    .vidw       (vidw),
-    // -- PROGRAM --
-    .prga       (prga),
-    .prgi       (prgi),
-    .prgd       (prgd),
-    .prgw       (prgw),
+    // -- Удвоение 2Y --
+    .x2a        (x2a),
+    .x2i        (x2i),
+    .x2o        (x2o),
+    .x2w        (x2w),
 );
 
 // Подключение модулей памяти
-// --------------------------------------------------------------
+// ---------------------------------------------------------------------
 
 // 2K RAM
 mem_ram DendyRAM
@@ -192,7 +219,7 @@ mem_prg DendyPROGRAM
     .q          (prg_in),
 );
 
-// 64K для знакогенератора [8k x 8]
+// 8K для знакогенератора
 mem_chr DendyCHRROM
 (
     .clock      (clock_100),
@@ -236,4 +263,7 @@ mem_x2 MemoryDoubleVGA
 
 endmodule
 
+// ---------------------------------------------------------------------
+
+`include "../cpu.v"
 `include "../ppu.v"

@@ -26,19 +26,18 @@ module ppu
     input       [ 7:0]  cpu_o,      // Данные записи
     input               cpu_w,      // Сигнал записи
     input               cpu_r,      // Сигнал чтения
-    // --- Джойстики ---
-    input       [7:0]   joy1,
-    input       [7:0]   joy2,
-    // --- Счетчики ---
-    output reg  [8:0]   px,         // PPU.x = 0..340
-    output reg  [8:0]   py,         // PPU.y = 0..261
+    // --- PRG-ROM ---
+    output  reg [15:0]  prga,       // Адрес памяти RAM, PRG
+    input       [ 7:0]  prgi,       // Чтение из памяти
+    output  reg [ 7:0]  prgd,       // Запись в память
+    output  reg         prgw,       // Сигнал записи
     // --- Видеопамять ---
     output reg  [14:0]  chra,       // Адрес в видеопамяти
     input       [ 7:0]  chrd,       // Данные из видеопамяти
-    // --- OAM ---
+    // --- OAM R/W ---
     output reg  [ 7:0]  oama,
     input       [ 7:0]  oamd,
-    output reg  [ 7:0]  oam2a,      // Операции с OAM
+    output reg  [ 7:0]  oam2a,
     input       [ 7:0]  oam2i,
     output reg  [ 7:0]  oam2o,
     output reg          oam2w,
@@ -47,16 +46,17 @@ module ppu
     input       [ 7:0]  vidi,
     output reg  [ 7:0]  vido,
     output reg          vidw,
-    // --- PRG-ROM ---
-    output  reg [15:0]  prga,       // Адрес памяти RAM, PRG
-    input       [ 7:0]  prgi,       // Чтение из памяти
-    output  reg [ 7:0]  prgd,       // Запись в память
-    output  reg         prgw,       // Сигнал записи
+    // --- Джойстики ---
+    input       [7:0]   joy1,
+    input       [7:0]   joy2,
     // --- Удвоение сканлайна ---
     output reg  [ 7:0]  x2a,
     input       [ 7:0]  x2i,
     output reg  [ 7:0]  x2o,
     output reg          x2w,
+    // --- Счетчики ---
+    output reg  [8:0]   px,         // PPU.x = 0..340
+    output reg  [8:0]   py,         // PPU.y = 0..261
     // --- Управление ---
     output reg          ce_cpu,
     output reg          ce_ppu,
