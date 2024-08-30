@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 module mem_chr(clock, a, d, q, w, ax, dx, wx, qx);
 input           clock;
-input    [12:0] a, ax;
+input    [15:0] a, ax;
 input    [ 7:0] d, dx;
 output   [ 7:0] q, qx;
 input           w, wx;
@@ -62,10 +62,10 @@ defparam
     altsyncram_component.outdata_reg_b              = "UNREGISTERED",
     altsyncram_component.power_up_uninitialized     = "FALSE",
     altsyncram_component.ram_block_type             = "M10K",
-    altsyncram_component.numwords_a                 = 8192,
-    altsyncram_component.numwords_b                 = 8192,
-    altsyncram_component.widthad_a                  = 13,
-    altsyncram_component.widthad_b                  = 13,
+    altsyncram_component.numwords_a                 = 65536,
+    altsyncram_component.numwords_b                 = 65536,
+    altsyncram_component.widthad_a                  = 16,
+    altsyncram_component.widthad_b                  = 16,
     altsyncram_component.width_a                    = 8,
     altsyncram_component.width_b                    = 8,
     altsyncram_component.width_byteena_a            = 1,

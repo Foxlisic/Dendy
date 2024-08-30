@@ -119,6 +119,10 @@ joy SegaJoy1
 // Маппер
 // --------------------------------------------------------------
 
+wire        prg_size = SW[0];       // 0=16K 1=32K
+wire [2:0]  chr_bank = SW[3:1];     // 8 Номер CHR-TABLE
+wire [2:0]  prg_bank = SW[6:4];     // 8 Смещение PRG-TABLE [16K]
+
 wire        reset_n = RESET_N & locked;
 wire [7:0]  x2a, x2i, x2o, oama, oamd;
 wire [7:0]  chr_i, vrm_i;
@@ -138,9 +142,8 @@ wire [15:0] cpu_a;
 wire [ 7:0] cpu_i, cpu_o;
 wire        ce_cpu, nmi, cpu_w, cpu_r;
 
-// Может переключаться маппером
-// 14:0 - 32K, 13:0 - 16K ROM
-wire [16:0] prg_address = prga[13:0];
+// Переключается маппером [prg_bank]
+wire [16:0] prg_address = (prg_bank << 14) + (prg_size ? prga[14:0] : prga[13:0]);
 
 // Выбор источника памяти
 wire        w_rom = (prga >= 16'h8000);
@@ -219,18 +222,8 @@ ppu DendyPPU
     .x2w        (x2w),
 );
 
-// Подключение модулей памяти
+// Программная память, переключаемая маппером
 // ---------------------------------------------------------------------
-
-// 2K RAM
-mem_ram DendyRAM
-(
-    .clock      (clock_100),
-    .a          (prga[10:0]),
-    .d          (prgd),
-    .q          (ram_in),
-    .w          (prgw & w_ram),
-);
 
 // 128K для памяти программ :: работает по мапперу
 mem_prg DendyPROGRAM
@@ -244,11 +237,24 @@ mem_prg DendyPROGRAM
 mem_chr DendyCHRROM
 (
     .clock      (clock_100),
-    .a          (chra[12:0]),
+    .a          ({chr_bank, chra[12:0]}), // 15 14 13] 12
     .q          (chr_i),
 );
 
-// 2K для знакогенератора
+// Подключение модулей памяти
+// ---------------------------------------------------------------------
+
+// 2K RAM
+mem_ram DendyRAM
+(
+    .clock      (clock_100),
+    .a          (prga[10:0]),
+    .d          (prgd),
+    .q          (ram_in),
+    .w          (prgw & w_ram),
+);
+
+// 2K для Name Tables
 mem_vrm DendyVideoRAM
 (
     .clock      (clock_100),
