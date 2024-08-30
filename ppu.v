@@ -127,6 +127,7 @@ reg  [23:0] joy1_in, joy2_in;
 // ---------------------------------------------------------------------
 reg  [31:0] sp[8];
 reg  [ 7:0] oam_y;              // Временное Y
+reg  [ 7:0] oam2c;              // Кешированный адрес OAM
 reg  [ 3:0] oam_st;
 reg  [ 3:0] oam_ln;             // Отступ от верха спрайта
 reg  [ 3:0] oam_id;             // oam_id[3] == Overflow
@@ -571,8 +572,17 @@ begin
                         end
 
                         // Операции с памятью спрайтов
-                        3: if (cpu_w) begin oam2a <= cpu_a[7:0]; end
-                        4: if (cpu_w) begin oam2o <= cpu_o; oam2w <= 1; end
+                        3: if (cpu_w) oam2c <= cpu_o;
+
+                        // Записать спрайт
+                        4: begin
+
+                            oam2a <= oam2c;
+                            oam2o <= cpu_o;
+                            oam2w <= cpu_w;
+                            oam2c <= oam2c + 1;
+
+                        end
 
                         // Скроллинг
                         5: if (cpu_w) begin
@@ -627,13 +637,11 @@ begin
 
                                 end else begin
 
-                                    vida <= va;
-                                    vido <= cpu_o;
-                                    vidw <= (va >= 16'h2000 && va < 16'h3F00);
+                                    vida  <= va;
+                                    vido  <= cpu_o;
+                                    vidw  <= (va >= 16'h2000 && va < 16'h3F00);
 
                                 end
-
-                                vidch <= cpu_o;
 
                             end else if (cpu_r) begin
 
@@ -642,10 +650,7 @@ begin
 
                                 // $3F00-$3F1F Палитры
                                 if (va >= 16'h3F00 && va < 16'h4000) begin
-
                                     cpu_i <= bgpal[va[1:0] == 2'b00 ? 0 : va[4:0]];
-                                    vidch <= cpu_o;
-
                                 end
 
                             end
@@ -695,8 +700,7 @@ begin
                         1: if (cpu_r) cpu_i <= ctrl1;
 
                         // Запись или чтение OAM
-                        4: if (cpu_w) begin oam2a <= oam2a + 1; end
-                                 else begin oam2a <= oam2a + 1; cpu_i <= oam2i; end
+                        4: if (cpu_r) cpu_i <= oam2i;
 
                         // Чтение из памяти байта
                         7: if (cpu_r && va < 16'h3F00) vidch <= vidi;

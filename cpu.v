@@ -156,7 +156,7 @@ if (reset_n == 1'b0) begin
     t   <= BRK;
     m   <= 0;
     n   <= 0;
-    a   <= 8'hC2;
+    a   <= 8'h21;
     x   <= 8'h83;
     y   <= 8'h81;
     s   <= 8'h00;

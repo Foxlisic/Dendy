@@ -8,7 +8,7 @@ always #2.0 clock25     = ~clock25;
 initial begin reset_n = 0; clock = 0; clock25 = 0; #3.0 reset_n = 1; #12000 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 // ---------------------------------------------------------------------
-wire debugcpu = 1;
+wire debugcpu = 0;
 // ---------------------------------------------------------------------
 reg  [ 7:0] prg[65536];
 reg  [ 7:0] vmm[65536];
@@ -58,7 +58,7 @@ cpu DendyCPU
 (
     .clock      (clock25),
     .reset_n    (reset_n),
-    .ce         (debugcpu | ce_cpu), //
+    .ce         (debugcpu | ce_cpu),
     .nmi        (nmi),
     .A          (A),
     .I          (debugcpu ? Ix : I),
