@@ -13,7 +13,7 @@ wav:
 	gtkwave tb.gtkw
 app: syn
 	g++ -Ofast -Wno-unused-result -o tb -I$(VLIB) \
-		tb.cc \
+		nes.cc \
 		$(VLIB)/verilated_threads.cpp \
 		$(VLIB)/verilated.cpp \
 		obj_dir/Vppu__ALL.a \
