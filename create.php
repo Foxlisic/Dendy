@@ -2,11 +2,39 @@
 
 switch ($argv[1])
 {
+    // Сбор в мультиигровку
+    case 'multi':
+
+        $PRG = 0; $program = '';
+        $CHR = 0; $chrdata = '';
+
+        foreach (array_slice($argv, 2) as $rom) {
+
+            $data    = file_get_contents(glob("roms/$rom*.nes")[0]);
+            $prg_num = ord($data[4]);
+            $chr_num = ord($data[5]);
+
+            // Прочесть программу и данные
+            $program .= substr($data, 16,  $prg_num * 16384);
+            $chrdata .= substr($data, 16 + $prg_num * 16384, $chr_num * 8192);
+
+            // Для информации, где и что лежит
+            echo "[$rom] PRG=$PRG CHR=$CHR SIZE=".($prg_num - 1)."\n";
+
+            $PRG += $prg_num;
+            $CHR += $chr_num;
+        }
+
+        file_put_contents("de0/mif_prg.mif", create_mif($program, $PRG * 16384));
+        file_put_contents("de0/mif_chr.mif", create_mif($chrdata, $CHR * 8192));
+
+        break;
+
     // Подготовка MIF-файлов
     case 'nes':
 
         $in      = $argv[2];
-        $data    = file_get_contents(glob("$in*.nes")[0]);
+        $data    = file_get_contents(glob("roms/$in*.nes")[0]);
         $prg_num = ord($data[4]);
         $chr_num = ord($data[5]);
 
@@ -21,9 +49,9 @@ switch ($argv[1])
     case 'test':
 
         $in      = $argv[2];
-        $data    = file_get_contents(glob("$in*.nes")[0]);
-        $video   = file_get_contents(glob("$in*video.bin")[0]);
-        $oamdata = file_get_contents(glob("$in*oam.bin")[0]);
+        $data    = file_get_contents(glob("roms/$in*.nes")[0]);
+        $video   = file_get_contents(glob("roms/$in*video.bin")[0]);
+        $oamdata = file_get_contents(glob("roms/$in*oam.bin")[0]);
         $prg_num = ord($data[4]);
 
         $program = substr($data, 16, $prg_num * 16384);

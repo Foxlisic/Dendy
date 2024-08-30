@@ -6,7 +6,7 @@ ica:
 	vvp tb.qqq >> /dev/null
 	rm tb.qqq
 cre:
-	php create.php nes roms/01
+	php create.php multi 01 02
 vcd:
 	gtkwave tb.vcd
 wav:
