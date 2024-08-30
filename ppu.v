@@ -112,6 +112,7 @@ reg  [ 7:0] vidch;
 reg         w = 0;
 reg         dma = 0;
 reg         vsync;
+reg  [ 2:0] frmc;               // Для пропуска кадров
 reg  [ 1:0] ct_cpu = 0;
 reg  [ 2:0] finex = 0, finex_ff = 0;
 reg  [ 7:0] ctrl0;              // $2000
@@ -223,6 +224,7 @@ begin
     ct_cpu      <= 0;
     vidch       <= 8'hFF;
     vsync       <= 0;
+    frmc        <= 0;
 
     joy1_ff     <= 0;
     joy1_in     <= 0;
@@ -408,7 +410,7 @@ begin
             // 3Т PPU = 1T CPU
             // На время работы DMA отключить CPU от памяти
             ct_cpu <= (ct_cpu == 2) ? 0 : ct_cpu + 1;
-            ce_cpu <= (ct_cpu == 0) && (dma == 0);
+            ce_cpu <= (ct_cpu == 0) && (dma == 0) && (frmc != 5);
             ce_ppu <= 1;
 
             // Формирование фоновой картинки
@@ -498,6 +500,9 @@ begin
                 oam_hit <= 0;
                 nmi     <= 0;
                 vsync   <= 0;
+
+                // [0..4] CPU On [5] CPU Off :: Пропуск кадров для 50 Гц PAL
+                frmc  <= frmc == 5 ? 0 : frmc + 1;
 
             end
 
@@ -676,11 +681,12 @@ begin
                     // $4014 DMA: Активация записи в OAM из MEMORY
                     16'b0100_0000_0001_0100: if (cpu_w) begin dma <= 1; end
 
-                    // 4016 JOYSTICK. Чтение данных
-                    16'b0100_0000_0001_0110: if (cpu_r) begin
+                    // $4016+ JOYSTICK 1/2. Чтение данных
+                    16'b0100_0000_0001_011x: if (cpu_r) begin
 
-                        cpu_i   <= {7'b0100_000, joy1_in[0]};
+                        cpu_i   <= {7'b0100_000, cpu_a[0] ? joy2_in[0] : joy1_in[0]};
                         joy1_in <= joy1_in >> 1;
+                        joy2_in <= joy2_in >> 1;
 
                     end
 

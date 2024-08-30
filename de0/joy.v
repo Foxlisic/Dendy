@@ -21,7 +21,7 @@ if (t == 499) begin
     case (i)
     // Основной набор A,B [C-Select] Start, Управление
     0:   begin pin_d7 <= 1'b1; end
-    2:   begin pin_d7 <= 1'b0; {joy[7:4], joy[2], joy[0]} <= {/*R*/  pin_d4, /*L*/ pin_d3, /*D*/ pin_d2, /*U*/ pin_d1, /*С*/ pin_d9,  /*B*/ pin_d6}; end
+    2:   begin pin_d7 <= 1'b0; {joy[7:4], joy[2], joy[0]} <= {/*R*/  pin_d4, /*L*/ pin_d3, /*D*/ pin_d2, /*U*/ pin_d1, /*С*/ pin_d9, /*B*/ pin_d6}; end
     4:   begin pin_d7 <= 1'b1; {          joy[3], joy[1]} <= {/*ST*/ pin_d9, /*A*/ pin_d6}; end
     // Дополнительный набор MODE, X, Y, Z
     5,7: begin pin_d7 <= 1'b0; end

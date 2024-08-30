@@ -119,6 +119,8 @@ joy SegaJoy1
 // Маппер
 // --------------------------------------------------------------
 
+// assign LEDR = SW;
+
 wire        prg_size = SW[0];       // 0=16K 1=32K
 wire [2:0]  chr_bank = SW[3:1];     // 8 Номер CHR-TABLE
 wire [2:0]  prg_bank = SW[6:4];     // 8 Смещение PRG-TABLE [16K]
@@ -237,7 +239,7 @@ mem_prg DendyPROGRAM
 mem_chr DendyCHRROM
 (
     .clock      (clock_100),
-    .a          ({chr_bank, chra[12:0]}), // 15 14 13] 12
+    .a          ({chr_bank, chra[12:0]}), // [15 14 13] 12
     .q          (chr_i),
 );
 
