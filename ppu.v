@@ -120,8 +120,7 @@ reg  [ 7:0] ctrl1;              // $2001
 reg  [15:0] bgtile, _bgtile;    // Сохраненное значение тайла фона
 reg  [ 1:0] bgattr;             // Номер палитры для фона (0..2)
 reg  [ 5:0] cl = 6'h00;
-reg  [ 5:0] bgpal[16];          // Палитра фона
-reg  [ 5:0] sppal[16];          // Палитра спрайтов
+reg  [ 5:0] bgpal[32];          // Палитра фона и спрайтов
 // ---------------------------------------------------------------------
 reg         joy1_ff;            // Защелка джойстика
 reg  [23:0] joy1_in, joy2_in;
@@ -204,7 +203,7 @@ wire [4:0]  pipe_6 = (showsp && oam_id >= 7 && sp6_b && sp6_u && sp6_i[1:0]) ? s
 wire [4:0]  pipe_7 = (showsp && oam_id >= 8 && sp7_b && sp7_u && sp7_i[1:0]) ? sp7_i : pipe_6;
 
 //-- Слой 2: Итоговый цвет
-wire [5:0]  dst    = pipe_7[4] ? sppal[pipe_7[3:0]] : bgpal[pipe_7[3:0]];
+wire [5:0]  dst    = bgpal[ pipe_7[4:0] ];
 
 // Процессор
 // ---------------------------------------------------------------------
@@ -251,11 +250,11 @@ begin
     bgpal[ 8] <= 6'h00; bgpal[ 9] <= 6'h26; bgpal[10] <= 6'h00; bgpal[11] <= 6'h30;
     bgpal[12] <= 6'h00; bgpal[13] <= 6'h38; bgpal[14] <= 6'h28; bgpal[15] <= 6'h10;
 
-    // Палитра фона
-    sppal[ 0] <= 6'h0F; sppal[ 1] <= 6'h16; sppal[ 2] <= 6'h27; sppal[ 3] <= 6'h12;
-    sppal[ 4] <= 6'h0F; sppal[ 5] <= 6'h30; sppal[ 6] <= 6'h2B; sppal[ 7] <= 6'h16;
-    sppal[ 8] <= 6'h0F; sppal[ 9] <= 6'h39; sppal[10] <= 6'h28; sppal[11] <= 6'h27;
-    sppal[12] <= 6'h0F; sppal[13] <= 6'h30; sppal[14] <= 6'h30; sppal[15] <= 6'h30;
+    // Палитра спрайтов
+    bgpal[16] <= 6'h0F; bgpal[17] <= 6'h16; bgpal[18] <= 6'h27; bgpal[19] <= 6'h12;
+    bgpal[20] <= 6'h0F; bgpal[21] <= 6'h30; bgpal[22] <= 6'h2B; bgpal[23] <= 6'h16;
+    bgpal[24] <= 6'h0F; bgpal[25] <= 6'h39; bgpal[26] <= 6'h28; bgpal[27] <= 6'h27;
+    bgpal[28] <= 6'h0F; bgpal[29] <= 6'h30; bgpal[30] <= 6'h30; bgpal[31] <= 6'h30;
 
 end
 else
@@ -621,10 +620,10 @@ begin
                             if (cpu_w) begin
 
                                 // $3F00-$3F1F Палитры
+                                // Все что пишем в 10h, то пишется в BG
                                 if (va >= 16'h3F00 && va < 16'h4000) begin
 
-                                    if (va[4]) sppal[va[3:0]] <= cpu_o;
-                                    else       bgpal[va[3:0]] <= cpu_o;
+                                    bgpal[ va[4:0] == 5'h10 ? 0 : va[4:0] ] <= cpu_o;
 
                                 end else begin
 
@@ -644,9 +643,7 @@ begin
                                 // $3F00-$3F1F Палитры
                                 if (va >= 16'h3F00 && va < 16'h4000) begin
 
-                                    if (va[4]) cpu_i <= sppal[va[3:0]];
-                                    else       cpu_i <= bgpal[va[3:0]];
-
+                                    cpu_i <= bgpal[va[1:0] == 2'b00 ? 0 : va[4:0]];
                                     vidch <= cpu_o;
 
                                 end
@@ -690,7 +687,7 @@ begin
 
                     end
 
-                    // Регистры видеопроцессора
+                    // $2000-$3FFF Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
 
                         // В денди не читает, но мало ли
