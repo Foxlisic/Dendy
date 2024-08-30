@@ -97,9 +97,31 @@ pll PLL0
     .locked     (locked)
 );
 
+// Джойстик сега
+// --------------------------------------------------------------
+
+wire [11:0] joy1;
+wire [11:0] joy2;
+
+assign LEDR = joy1[9:0];
+
+joy SegaJoy1
+(
+    .clock      (clock_25),
+    .pin_d1     (~GPIO_1[29]),
+    .pin_d2     (~GPIO_1[28]),
+    .pin_d3     (~GPIO_1[26]),
+    .pin_d4     (~GPIO_1[27]),
+    .pin_d6     (~GPIO_1[24]),
+    .pin_d9     (~GPIO_1[25]),
+    .pin_d7     ( GPIO_1[22]),
+    .joy        (joy1)
+);
+
 // Маппер
 // --------------------------------------------------------------
 
+wire        reset_n = RESET_N & locked;
 wire [7:0]  x2a, x2i, x2o, oama, oamd;
 wire [7:0]  chr_i, vrm_i;
 wire        x2w;
@@ -112,7 +134,6 @@ wire [15:0] prga;
 wire [14:0] vida;
 wire [ 7:0] oam2a, oam2i, oam2o, vidi, vido, prgd;
 wire        oam2w, vidw, prgw;
-wire [ 7:0] joy1, joy2;
 
 // CPU
 wire [15:0] cpu_a;
@@ -139,7 +160,7 @@ wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vrm_i : 8'hFF);
 cpu DendyCPU
 (
     .clock      (clock_25),
-    .reset_n    (locked),
+    .reset_n    (reset_n),
     .ce         (ce_cpu),
     .nmi        (nmi),
     .A          (cpu_a),
@@ -155,7 +176,7 @@ cpu DendyCPU
 ppu DendyPPU
 (
     .clock25    (clock_25),
-    .reset_n    (locked),
+    .reset_n    (reset_n),
     .ce_cpu     (ce_cpu),
     .nmi        (nmi),
     // -- VGA --
@@ -171,8 +192,8 @@ ppu DendyPPU
     .cpu_r      (cpu_r),
     .cpu_w      (cpu_w),
     // --- Джойстики ---
-    .joy1       (joy1),
-    .joy2       (joy2),
+    .joy1       (joy1[7:0]),
+    .joy2       (joy2[7:0]),
     // -- PROGRAM --
     .prga       (prga),
     .prgi       (prgi),
