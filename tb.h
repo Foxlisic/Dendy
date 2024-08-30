@@ -504,9 +504,11 @@ public:
                     if (W) {
 
                         if (_ppu_va >= 0x3F00 && _ppu_va < 0x4000) {
-                            _ppu_pa[_ppu_va & 0x1F] = D;
-                            _ppu_ch = D;
-
+                            if ((_ppu_va & 0x1F) == 0x10) {
+                                _ppu_pa[0] = D;
+                            } else {
+                                _ppu_pa[_ppu_va & 0x1F] = D;
+                            }
                         } else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
                             videom[(_ppu_va & vmemsize) + 0x2000] = D;
                         }
@@ -515,18 +517,14 @@ public:
 
                         // PALETTE
                         if (_ppu_va >= 0x3F00 && _ppu_va < 0x4000) {
-                            I = _ppu_pa[_ppu_va & 0x1F];
+                            I = _ppu_va & 0x1F;
+                            I = _ppu_pa[I == 16 ? 0 : I];
                         }
                         // VIDEO MEMORY
-                        else if (_ppu_va >= 0x2000 && _ppu_va < 0x3F00) {
+                        else if (_ppu_va < 0x3F00) {
 
                             I = _ppu_ch;
-                            _ppu_ch = videom[(_ppu_va & vmemsize) + 0x2000];
-                        }
-                        // CHR-ROM
-                        else if (_ppu_va < 0x2000) {
-                            I = _ppu_ch;
-                            _ppu_ch = videom[_ppu_va];
+                            _ppu_ch = readv(_ppu_va);
                         }
                     }
 
@@ -566,11 +564,7 @@ public:
         ppu->oam2i = oam[ppu->oam2a];
 
         // Чтение CHR или ATTR для CPU: 1FFF
-        if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00) {
-            ppu->vidi  = videom[0x2000 + (ppu->vida & vmemsize)];
-        } else if (ppu->vida < 0x2000) {
-            ppu->vidi  = videom[ppu->vida];
-        }
+        ppu->vidi  = readv(ppu->vida);
 
         // -----------------------------------
 

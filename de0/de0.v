@@ -136,7 +136,8 @@ wire [ 7:0] ram_in;
 wire [14:0] chra;
 wire [15:0] prga;
 wire [14:0] vida;
-wire [ 7:0] oam2a, oam2i, oam2o, vidi, vido, prgd;
+wire [ 7:0] vidi_in, chr_in;
+wire [ 7:0] oam2a, oam2i, oam2o, vido, prgd;
 wire        oam2w, vidw, prgw;
 
 // CPU
@@ -155,7 +156,8 @@ wire        w_ram = (prga <  16'h2000);
 wire [ 7:0] prgi = w_rom ? prg_in : (w_ram ? ram_in : 8'hFF);
 
 // Чтение CHR-ROM или CHR-RAM
-wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vrm_i : 8'hFF);
+wire [7:0]  chrd = chra < 14'h2000 ? chr_i  : (chra < 14'h3F00 ? vrm_i   : 8'hFF);
+wire [7:0]  vidi = vida < 14'h2000 ? chr_in : (vida < 14'h3F00 ? vidi_in : 8'hFF);
 
 // CPU Central Processing Unix
 // ---------------------------------------------------------------------
@@ -241,6 +243,8 @@ mem_chr DendyCHRROM
     .clock      (clock_100),
     .a          ({chr_bank, chra[12:0]}), // [15 14 13] 12
     .q          (chr_i),
+    .ax         ({chr_bank, vida[12:0]}),
+    .qx         (chr_in),
 );
 
 // Подключение модулей памяти
@@ -263,7 +267,7 @@ mem_vrm DendyVideoRAM
     .a          (chra[10:0]),
     .q          (vrm_i),
     .ax         (vida[10:0]),
-    .qx         (vidi),
+    .qx         (vidi_in),
     .dx         (vido),
     .wx         (vidw),
 );
