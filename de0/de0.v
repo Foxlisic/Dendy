@@ -107,29 +107,31 @@ wire        x2w;
 // Чтение [CHR или VRAM]
 wire [ 7:0] prg_in;
 wire [ 7:0] ram_in;
-wire [13:0] chra;
-wire [15:0] prga, cpu_a;
-wire [ 7:0] oam2a, oam2i, oam2o, vidi, vidp, prgd, cpu_i, cpu_o;
-wire [ 7:0] joy1, joy2;
-wire        oam2w, vidw, prgw, ce_cpu, nmi, cpu_w, cpu_r;
+wire [14:0] chra;
+wire [15:0] prga;
 wire [14:0] vida;
+wire [ 7:0] oam2a, oam2i, oam2o, vidi, vido, prgd;
+wire        oam2w, vidw, prgw;
+wire [ 7:0] joy1, joy2;
+
+// CPU
+wire [15:0] cpu_a;
+wire [ 7:0] cpu_i, cpu_o;
+wire        ce_cpu, nmi, cpu_w, cpu_r;
 
 // Может переключаться маппером
 // 14:0 - 32K, 13:0 - 16K ROM
 wire [16:0] prg_address = prga[13:0];
 
 // Выбор источника памяти
-wire        w_rom = (prgi >= 16'h8000);
-wire        w_ram = (prgi <  16'h2000);
-wire [ 7:0] prgi =
-    w_rom ? prg_in :
-    w_ram ? ram_in :
-            8'hFF;
+wire        w_rom = (prga >= 16'h8000);
+wire        w_ram = (prga <  16'h2000);
 
-// Для видеоадаптера
-wire [7:0]  chrd =
-    chra < 14'h2000 ? chr_i :
-    chra < 14'h3F00 ? vrm_i : 8'hFF;
+// Либо чтение RAM, либо ROM
+wire [ 7:0] prgi = w_rom ? prg_in : (w_ram ? ram_in : 8'hFF);
+
+// Чтение CHR-ROM или CHR-RAM
+wire [7:0]  chrd = chra < 14'h2000 ? chr_i : (chra < 14'h3F00 ? vrm_i : 8'hFF);
 
 // CPU Central Processing Unix
 // ---------------------------------------------------------------------
@@ -208,7 +210,7 @@ mem_ram DendyRAM
     .a          (prga[10:0]),
     .d          (prgd),
     .q          (ram_in),
-    .w          (prgw && w_ram),
+    .w          (prgw & w_ram),
 );
 
 // 128K для памяти программ :: работает по мапперу
