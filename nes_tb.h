@@ -207,7 +207,7 @@ public:
                 disam(pc);
                 printf("%04X %s\n", pc, ds);
 
-            } else if (cpu->ce || PPU_MODEL == 1) {
+            } else if (cpu->ce && ((DEBUG1 == 2) && cpu->m0 || DEBUG1 == 1)) {
 
                 disam(cpu->A);
 

@@ -6,7 +6,7 @@
 // =0 Verilog =1 PPU C++ =2 CPU+PPU C++
 #define PPU_MODEL 0
 // Дебаг CPU
-#define DEBUG1 0
+#define DEBUG1 2
 // Порты
 #define DEBUG2 0
 // Видео область
