@@ -244,6 +244,8 @@ mem_chr DendyCHRROM
     .a          ({chr_bank, chra[12:0]}),
     .q          (chr_i),
     .ax         ({chr_bank, vida[12:0]}),
+    .dx         (vido),
+    .wx         (vidw && vida[14:13] == 2'b00),   // 0000-1FFF
     .qx         (chr_in),
 );
 
@@ -269,7 +271,7 @@ mem_vrm DendyVideoRAM
     .ax         (vida[11:0]),
     .qx         (vidi_in),
     .dx         (vido),
-    .wx         (vidw),
+    .wx         (vidw && vida[14:13] == 2'b01), // 2000-3FFF
 );
 
 // 1K для символов спрайтов
