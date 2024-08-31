@@ -15,7 +15,7 @@ protected:
     // Обработка фрейма
     int         width, height, scale, frame_length, pticks;
     int         x, y, _hs, _vs, instr = 125000;
-    int         tick_count = 0;
+    int         cycles_count = 0;
 
     uint8_t*    videom;
     uint8_t*    chrrom;
@@ -211,17 +211,22 @@ public:
 
                 disam(cpu->A);
 
-                printf("%c%04X R-%02X %s%02X R:[%02X %02X %02X %02X] V:[%04X %c] %c %s\n",
-                    (cpu->m0 ? '*' : ' '),
+                // Cycles Bank:PC Read Write [A X Y P] Vida px py NMI
+                printf("%08X %c%1X:%04X %02X %s%02X [%02X %02X %02X %02X] V-%04X%c {%03d %03d} %c | %s\n",
+                    cycles_count,
+                    (cpu->m0 && DEBUG1 == 1 ? '^' : ' '),
+                    prg_bank,
                     cpu->A,
                     cpu->I,
-                    (cpu->W ? "W-" : "  "),
+                    (cpu->W ? ">" : " "),
                     cpu->D,
                     // --
                     cpu->_a, cpu->_x, cpu->_y, cpu->_p,
                     //
                     (PPU_MODEL == 1 ? _ppu_dm : ppu->vida),
                     (ppu->vidw ? '~' : ' '),
+                    ppu->px,
+                    ppu->py,
                     (cpu->nmi ? 'N' : ' '),
                     cpu->m0 ? ds : ""
                 );

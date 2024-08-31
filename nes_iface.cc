@@ -100,8 +100,6 @@ void TB::write(uint16_t A, uint8_t D)
 // 1 Такт CPU + PPU обвязка + VGA
 int TB::tick()
 {
-    tick_count++;
-
     // 4=0xFFF 2=0x7FFF || 2 страницы
     int vmemsize = 0xFFF;
 
@@ -163,6 +161,8 @@ int TB::tick()
     debug();
     cpu->clock = 0; cpu->eval();
     cpu->clock = 1; cpu->eval();
+
+    if (cpu->ce) cycles_count++;
 
     vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
 
