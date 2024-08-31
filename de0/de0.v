@@ -122,7 +122,7 @@ joy SegaJoy1
 // assign LEDR = SW;
 
 wire        prg_size = SW[0];       // 0=16K 1=32K
-wire [2:0]  chr_bank = SW[3:1];     // 8 Номер CHR-TABLE
+wire [3:0]  chr_bank = SW[3:1];     // 8 Номер CHR-TABLE
 wire [2:0]  prg_bank = SW[6:4];     // 8 Смещение PRG-TABLE [16K]
 
 wire        reset_n = RESET_N & locked;
@@ -226,7 +226,7 @@ ppu DendyPPU
     .x2w        (x2w),
 );
 
-// Программная память, переключаемая маппером
+// Программная память :: 256K MAX
 // ---------------------------------------------------------------------
 
 // 128K для памяти программ :: работает по мапперу
@@ -237,7 +237,7 @@ mem_prg DendyPROGRAM
     .q          (prg_in),
 );
 
-// 8K для знакогенератора
+// 128K для знакогенератора [16x8]
 mem_chr DendyCHRROM
 (
     .clock      (clock_100),
@@ -249,7 +249,7 @@ mem_chr DendyCHRROM
     .qx         (chr_in),
 );
 
-// Подключение модулей памяти
+// Подключение памяти :: 2K RAM + 4K NT + 1K OAM + 1K SCANLINE = 8K
 // ---------------------------------------------------------------------
 
 // 2K RAM
