@@ -55,6 +55,7 @@ protected:
     int         mapper      = 0;
     int         mapper_chrw = 1;
     int         prg_bank    = 0;
+    int         _cpu_m0     = 0;
 
     // Модули
     Vppu*       ppu;
@@ -136,6 +137,7 @@ public:
 
                 // Номер маппера
                 mapper      = (ines[6] >> 4) | (ines[7] & 0xF0);
+                prg_bank    = cnt_prg_rom - 1;
 
                 printf("PRGROM %d\n", cnt_prg_rom);
                 printf("CHRROM %d\n", cnt_chr_rom);

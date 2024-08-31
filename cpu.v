@@ -363,7 +363,8 @@ else if (ce) begin
         // Недокументированные инструкции
         // -----------------------
         // AAC: AND + Carry
-        8'h0B, 8'h2B: begin a <= ar[7:0]; p <= ap; p[CF] <= ar[7]; end
+        8'h0B,
+        8'h2B: begin a <= ar[7:0]; p <= ap; p[CF] <= ar[7]; end
 
         // ASR: AND + LSR
         8'h4B: begin a <= ar[7:1]; {p[CF], p[SF], p[ZF]} <= {ar[0], 1'b0, ar[7:1] == 0}; end
@@ -372,12 +373,13 @@ else if (ce) begin
         8'h6B: begin a <= {p[CF], ar[7:1]}; {p[VF], p[CF], p[ZF]} <= {ar[6] ^ ar[7], ar[7], {p[CF], ar[7:1]} == 0}; end
         // -----------------------
 
-        // Сдвиги, INC, DEC: Запись в память
+        // ASL, LSR, ROR, ROL, INC, DEC: Запись в память
         8'b0xx_xx1_10,
         8'b11x_xx1_10: case (n)
 
-            0: begin n <= 1; t <= RUN; W <= 1; D <= ar; p <= ap; m <= 1; end
-            1: begin n <= 2; t <= RUN; end
+            // Пишется сначала НЕ модифицированное значение [это важно для MMC1]
+            0: begin n <= 1; t <= RUN; W <= 1; D <= I;  m <= 1; end
+            1: begin n <= 2; t <= RUN; W <= 1; D <= ar; m <= 1; p <= ap; end
 
         endcase
 

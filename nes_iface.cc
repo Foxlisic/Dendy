@@ -3,7 +3,19 @@ uint8_t TB::readv(uint16_t A)
 {
     // Знакогенератор CHR-ROM и видеопамять для PPU
     if (A < 0x2000) {
-        return chrrom[A];
+
+        // Зависит от выбора маппера
+        switch (mapper) {
+
+            case 1: // MMC1
+
+                printf("MMC1V\n"); exit(1);
+                break;
+
+            default:
+
+                return chrrom[A];
+        }
     }
     // Зеркалирование VRAM [4 страницы] 2Dendy + 2Cartridge
     else if (A >= 0x2000 && A < 0x3F00) {
@@ -13,6 +25,7 @@ uint8_t TB::readv(uint16_t A)
     return 0xFF;
 }
 
+// Чтение из памяти с различными мапперами
 uint8_t TB::read(uint16_t A)
 {
     uint8_t  I;
@@ -27,14 +40,23 @@ uint8_t TB::read(uint16_t A)
 
         a &= 0x7FFF;
 
-        // UNROM
-        if (mapper == 2) {
+        switch (mapper) {
 
-            a &= 0x3FFF;
-            I  = program[a + 16384*(A >= 0xC000 ? cnt_prg_rom-1 : prg_bank)];
+            case 1: // MMC1
 
-        } else {
-            I = program[a];
+                printf("MMC1R\n"); exit(1);
+                break;
+
+            case 2: // UnROM
+
+                a &= 0x3FFF;
+                I  = program[a + 16384*(A >= 0xC000 ? cnt_prg_rom-1 : prg_bank)];
+                break;
+
+            default:
+
+                I = program[a];
+                break;
         }
     }
 
@@ -52,10 +74,22 @@ void TB::write(uint16_t A, uint8_t D)
         eppu_rw(A, 0, 0, 1, D);
     }
 
-    if (mapper == 2) {
+    switch (mapper) {
 
-        // UnROM пишется банк
-        if (A >= 0x8000) prg_bank = D & 15;
+        case 1: // MMC1
+
+            // Запись D0 только при _cpu_m0=1
+            // After the fifth write, the shift register is cleared automatically
+
+            printf("MMC1W\n"); exit(1);
+            _cpu_m0 = 0;
+            break;
+
+        case 2: // UnROM :: пишется банк
+
+            if (A >= 0x8000) prg_bank = D & 15;
+            break;
+
     }
 
     if (A < 0x2000) {
@@ -122,6 +156,9 @@ int TB::tick()
     cpu->I   = ppu->cpu_i;
     cpu->ce  = ppu->ce_cpu;
     cpu->nmi = ppu->nmi;
+
+    // Для маппера
+    if (cpu->m0) _cpu_m0 = 1;
 
     debug();
     cpu->clock = 0; cpu->eval();
