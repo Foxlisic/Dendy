@@ -241,7 +241,7 @@ mem_prg DendyPROGRAM
 mem_chr DendyCHRROM
 (
     .clock      (clock_100),
-    .a          ({chr_bank, chra[12:0]}), // [15 14 13] 12
+    .a          ({chr_bank, chra[12:0]}),
     .q          (chr_i),
     .ax         ({chr_bank, vida[12:0]}),
     .qx         (chr_in),
@@ -260,13 +260,13 @@ mem_ram DendyRAM
     .w          (prgw & w_ram),
 );
 
-// 2K для Name Tables
+// 4K для Name Tables
 mem_vrm DendyVideoRAM
 (
     .clock      (clock_100),
-    .a          (chra[10:0]),
+    .a          (chra[11:0]),
     .q          (vrm_i),
-    .ax         (vida[10:0]),
+    .ax         (vida[11:0]),
     .qx         (vidi_in),
     .dx         (vido),
     .wx         (vidw),
