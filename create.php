@@ -10,7 +10,8 @@ switch ($argv[1])
 
         foreach (array_slice($argv, 2) as $rom) {
 
-            $data    = file_get_contents(glob("roms/$rom*.nes")[0]);
+            $file    = glob("roms/$rom*.nes")[0];
+            $data    = file_get_contents($file);
             $prg_num = ord($data[4]);
             $chr_num = ord($data[5]);
 
@@ -19,7 +20,7 @@ switch ($argv[1])
             $chrdata .= substr($data, 16 + $prg_num * 16384, $chr_num * 8192);
 
             // Для информации, где и что лежит
-            echo "[$rom] PRG=$PRG CHR=$CHR SIZE=".($prg_num - 1)."\n";
+            echo "[$rom] PRG=$PRG CHR=$CHR SIZE=".($prg_num - 1)." ".basename($file)."\n";
 
             $PRG += $prg_num;
             $CHR += $chr_num;
