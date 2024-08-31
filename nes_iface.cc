@@ -50,8 +50,8 @@ int TB::tick()
 {
     tick_count++;
 
-    // 0xFFF
-    int vmemsize = 0x7FF;
+    // 4=0xFFF 2=0x7FFF || 2 страницы
+    int vmemsize = 0xFFF;
 
     // Для сканлайна 25 Мгц тактируется
     if (ppu->x2w) { x2line[ppu->x2a] = ppu->x2o; }
@@ -63,7 +63,7 @@ int TB::tick()
     // Запись в OAM
     if (ppu->oam2w) oam[ppu->oam2a] = ppu->oam2o;
 
-    // Запись в видеопамять [4k]
+    // Запись в видеопамять [2k]
     if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00 && ppu->vidw) {
         videom[0x2000 + (ppu->vida & vmemsize)] = ppu->vido;
     }

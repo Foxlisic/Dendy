@@ -6,7 +6,7 @@ ica:
 	vvp tb.qqq >> /dev/null
 	rm tb.qqq
 cre:
-	php create.php multi 01 02 03 05 06
+	php create.php multi 04 01 02 03 05 06
 vcd:
 	gtkwave tb.vcd
 wav:
@@ -22,8 +22,9 @@ app: syn
 	#./tb roms/07_lodehack.nes > tb.log
 	#./tb roms/01_lode.nes roms/01_video.bin roms/01_oam.bin > tb.log
 	#./tb roms/02_battlecity.nes > tb.log
-	./tb roms/04_mario.nes > tb.log
+	#./tb roms/04_mario.nes > tb.log
 	#./tb roms/05_nutsmilk.nes > tb.log
+	./tb roms/08_iceclimber.nes > tb.log
 syn:
 	verilator -cc ppu.v > /dev/null
 	verilator -cc cpu.v > /dev/null
