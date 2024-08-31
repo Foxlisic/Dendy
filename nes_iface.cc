@@ -15,7 +15,8 @@ uint8_t TB::readv(uint16_t A)
 
 uint8_t TB::read(uint16_t A)
 {
-    uint8_t I;
+    uint8_t  I;
+    uint16_t a = A;
 
     // Оперативная память
     if (A < 0x2000) {
@@ -23,7 +24,18 @@ uint8_t TB::read(uint16_t A)
     }
     // Память программ
     else if (A >= 0x8000) {
-        I = program[A & 0x7FFF];
+
+        a &= 0x7FFF;
+
+        // UNROM
+        if (mapper == 2) {
+
+            a &= 0x3FFF;
+            I  = program[a + 16384*(A >= 0xC000 ? cnt_prg_rom-1 : prg_bank)];
+
+        } else {
+            I = program[a];
+        }
     }
 
     if (PPU_MODEL == 2) {
@@ -38,6 +50,12 @@ void TB::write(uint16_t A, uint8_t D)
 {
     if (PPU_MODEL == 2) {
         eppu_rw(A, 0, 0, 1, D);
+    }
+
+    if (mapper == 2) {
+
+        // UnROM пишется банк
+        if (A >= 0x8000) prg_bank = D & 15;
     }
 
     if (A < 0x2000) {
@@ -63,9 +81,14 @@ int TB::tick()
     // Запись в OAM
     if (ppu->oam2w) oam[ppu->oam2a] = ppu->oam2o;
 
-    // Запись в видеопамять [2k]
+    // Запись в видеопамять
     if (ppu->vida >= 0x2000 && ppu->vida < 0x3F00 && ppu->vidw) {
         videom[0x2000 + (ppu->vida & vmemsize)] = ppu->vido;
+    }
+    // Запись в CHR-ROM [Если можно]
+    else if (ppu->vida < 0x2000 && ppu->vidw && mapper_chrw) {
+        videom[ppu->vida] = ppu->vido;
+        chrrom[ppu->vida] = ppu->vido;
     }
 
     // Чтение OAM, CHR

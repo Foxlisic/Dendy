@@ -52,6 +52,10 @@ protected:
     int         cnt_prg_rom;
     int         cnt_chr_rom;
 
+    int         mapper      = 0;
+    int         mapper_chrw = 1;
+    int         prg_bank    = 0;
+
     // Модули
     Vppu*       ppu;
     Vcpu*       cpu;
@@ -130,6 +134,13 @@ public:
                 cnt_prg_rom = ines[4];
                 cnt_chr_rom = ines[5];
 
+                // Номер маппера
+                mapper      = (ines[6] >> 4) | (ines[7] & 0xF0);
+
+                printf("PRGROM %d\n", cnt_prg_rom);
+                printf("CHRROM %d\n", cnt_chr_rom);
+                printf("Mapper %d\n", mapper);
+
                 // Читать программную память
                 fread(program, 1, cnt_prg_rom * 16384, fp);
 
@@ -140,7 +151,10 @@ public:
                 }
 
                 // Читать память CHR
-                fread(chrrom, cnt_chr_rom, 8192, fp);
+                if (cnt_chr_rom) {
+                    fread(chrrom, cnt_chr_rom, 8192, fp);
+                }
+
                 fclose(fp);
 
             } else {
