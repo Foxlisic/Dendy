@@ -648,7 +648,7 @@ begin
                                     // Для маппера UnROM возможна запись в CHR-TBL
                                     vida  <= nt_va;
                                     vido  <= cpu_o;
-                                    vidw  <= (va < 16'h3F00) && mapper_chrw;
+                                    vidw  <= (va < 16'h3F00) && (va >= 16'h2000 || mapper_chrw);
 
                                 end
 
