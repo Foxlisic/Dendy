@@ -108,6 +108,10 @@ int TB::tick()
     ppu->x2i = x2line[ppu->x2a];
 
     // --------------------------------
+    ppu->mapper_chrw = (mapper == 2);
+    ppu->mapper_nt   = 0; // 2k | 4k NT
+
+    // --------------------------------
     ppu->chrd = readv(ppu->chra);
 
     // Запись в OAM

@@ -27,10 +27,10 @@ module ppu
     input               cpu_w,      // Сигнал записи
     input               cpu_r,      // Сигнал чтения
     // --- PRG-ROM ---
-    output  reg [15:0]  prga,       // Адрес памяти RAM, PRG
+    output reg  [15:0]  prga,       // Адрес памяти RAM, PRG
     input       [ 7:0]  prgi,       // Чтение из памяти
-    output  reg [ 7:0]  prgd,       // Запись в память
-    output  reg         prgw,       // Сигнал записи
+    output reg  [ 7:0]  prgd,       // Запись в память
+    output reg          prgw,       // Сигнал записи
     // --- Видеопамять ---
     output reg  [14:0]  chra,       // Адрес в видеопамяти
     input       [ 7:0]  chrd,       // Данные из видеопамяти
@@ -55,12 +55,15 @@ module ppu
     output reg  [ 7:0]  x2o,
     output reg          x2w,
     // --- Счетчики ---
-    output reg  [8:0]   px,         // PPU.x = 0..340
-    output reg  [8:0]   py,         // PPU.y = 0..261
+    output reg  [8:0]   px,             // PPU.x = 0..340
+    output reg  [8:0]   py,             // PPU.y = 0..261
     // --- Управление ---
     output reg          ce_cpu,
     output reg          ce_ppu,
-    output reg          nmi
+    output reg          nmi,
+    // --- Маппер ---
+    input               mapper_chrw,    // Разрешение записи в CHR-ROM
+    input               mapper_nt       // =0 2 NT; =1 4 NT
 );
 
 assign {r, g, b} =
@@ -133,9 +136,8 @@ reg  [ 3:0] oam_id;             // oam_id[3] == Overflow
 reg         oam_hit;            // Sprite 0 Hit статус
 reg         sp_invx;            // Инверсия по X спрайта
 // ---------------------------------------------------------------------
-wire [ 1:0] nt          =   v[11:10]; //  ^v [11:10]
-wire [ 1:0] nt_vx       =  va[11:10]; //  ^va[11:10]
-wire        mapper_chrw = 1;
+wire [ 1:0] nt          = mapper_nt ?  v[11:10] : ^v [11:10];
+wire [ 1:0] nt_vx       = mapper_nt ? va[11:10] : ^va[11:10];
 // ---------------------------------------------------------------------
 // Выбор экранной страницы [.01x] [11..0]
 wire [14:0] nt_va       = {va[14:12], (va[14:13] == 2'b01 ? nt_vx : va[11:10]), va[9:0]};
@@ -696,10 +698,6 @@ begin
 
                     // $2000-$3FFF Регистры видеопроцессора
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
-
-                        // В денди не читает, но мало ли
-                        0: if (cpu_r) cpu_i <= ctrl0;
-                        1: if (cpu_r) cpu_i <= ctrl1;
 
                         // Запись или чтение OAM
                         4: if (cpu_r) cpu_i <= oam2i;
