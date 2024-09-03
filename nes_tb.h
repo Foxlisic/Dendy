@@ -57,6 +57,14 @@ protected:
     int         prg_bank    = 0;
     int         _cpu_m0     = 0;
 
+    // Звук
+    FILE*       wave_fp = NULL;
+    uint        wav_size = 0;
+    int         wav_timer = 0;
+
+    eAPU_square square[2];
+    int         eapu_cycle = 0;
+
     // Модули
     Vppu*       ppu;
     Vcpu*       cpu;
@@ -186,17 +194,15 @@ public:
         }
 
         pc = program[0x7FFC] + 256*program[0x7FFD];
+
+        wavStart("tb.wav");
     }
 
     void debug()
     {
-        if (DEBUG3 && ppu->vidw) {
-            printf("%04X %02X\n", ppu->vida, ppu->vido);
-        }
-
         // Отладка джойстика
-        if (DEBUG2 && cpu->A == 0x4014 && (cpu->R || cpu->W)) {
-            printf("%c %02X %02X\n", cpu->W ? 'w' : ' ', cpu->D, cpu->I);
+        if (DEBUG2 && cpu->ce && cpu->A >= 0x4000 && cpu->A < 0x4014 && (cpu->R || cpu->W)) {
+            printf("%04X: %c %02X __ %08b\n", cpu->A, cpu->W ? 'W' : ' ', cpu->D, cpu->D);
         }
 
         // Состояние ДО выполнения такта CPU
@@ -317,6 +323,7 @@ public:
     // Убрать окно из памяти
     int destroy()
     {
+        wavStop();
         free(screen_buffer);
         SDL_DestroyTexture(sdl_screen_texture);
         SDL_FreeFormat(sdl_pixel_format);
@@ -387,6 +394,11 @@ public:
     // ppu.cc :: Видеопроцессор
     int     eppu_rw(int A, int I, int R, int W, int D);
     int     tick_emulated();
+
+    // apu.cc :: Звук
+    void    wavStart(const char* filename);
+    void    wavStop();
+    uint8_t eApu(uint16_t A, uint8_t D, uint8_t I, int W, int R);
 
     // cpu.cc :: Процессор
 

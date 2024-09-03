@@ -150,3 +150,37 @@ static const int OPTYPES[256] =
     /* F0 */ REL, NDY, ___, NDY, ZPX, ZPX, ZPX, ZPX, IMP, ABY, IMP, ABY, ABX, ABX, ABX, ABX
 };
 
+// 44 байта https://audiocoding.ru/articles/2008-05-22-wav-file-structure/
+struct __attribute__((__packed__)) WAVEFMTHEADER {
+
+    unsigned int    chunkId;        // RIFF 0x52494646
+    unsigned int    chunkSize;
+    unsigned int    format;         // WAVE 0x57415645
+    unsigned int    subchunk1Id;    // fmt (0x666d7420)
+    unsigned int    subchunk1Size;  // 16
+    unsigned short  audioFormat;    // 1
+    unsigned short  numChannels;    // 2
+    unsigned int    sampleRate;     // 44100
+    unsigned int    byteRate;       // 88200
+    unsigned short  blockAlign;     // 2
+    unsigned short  bitsPerSample;  // 8
+    unsigned int    subchunk2Id;    // data 0x64617461
+    unsigned int    subchunk2Size;  // Количество байт в области данных.
+};
+
+// Значение длины периода ноты
+static const int EAPU_Length[32] = {
+//   0    1   2  3   4   5  6  7    8  9  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24   25  26  27  28  29  30  31
+    10, 254, 20, 2, 40, 80, 4, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
+};
+
+static const int EAPU_duty[4] = {0x01, 0x03, 0x0F, 0xFC};
+
+struct eAPU_square {
+
+    int duty,    loop, cnst, vol;
+    int sweep,   swperiod, negate, shift;
+    int timer,   period, tmp;
+    int counter, ac, out, decay;
+    int env_c,   bitp;
+};

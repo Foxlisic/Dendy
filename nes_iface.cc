@@ -162,11 +162,16 @@ int TB::tick()
     // Для маппера
     if (cpu->m0) _cpu_m0 = 1;
 
+    // Подсчет тиков CPU и включение APU
+    if (cpu->ce) {
+
+        eApu(cpu->A, cpu->D, cpu->I, cpu->W, cpu->R);
+        cycles_count++;
+    }
+
     debug();
     cpu->clock = 0; cpu->eval();
     cpu->clock = 1; cpu->eval();
-
-    if (cpu->ce) cycles_count++;
 
     vga(ppu->hs, ppu->vs, ppu->r*16*65536 + ppu->g*16*256 + ppu->b*16);
 
