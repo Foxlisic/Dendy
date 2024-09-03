@@ -22,6 +22,13 @@ void TB::wavStart(const char* filename)
         square[i].ac        = 0;
         square[i].bitp      = 0;
     }
+
+    triangle.counter = 0;
+    triangle.reload  = 0;
+    triangle.timer   = 0;
+    triangle.timer_c = 0;
+    triangle.period  = 0;
+    triangle.reload_flag = 0;
 }
 
 void TB::wavStop()
@@ -35,10 +42,10 @@ void TB::wavStop()
             0x20746d66,
             16,     // 16=PCM
             1,      // Тип
-            2,      // Каналы
+            1,      // Каналы
             44100,  // Частота дискретизации
             88200,  // Байт в секунду
-            2,      // Байт на семпл (1+1)
+            1,      // Байт на семпл (1+1)
             8,      // Битность
             0x61746164, // "data"
             wav_size
@@ -122,9 +129,43 @@ uint8_t TB::eApu(uint16_t A, uint8_t D, uint8_t I, int W, int R)
             if (DEBUG3) printf("[%04X] T=%d P=%d\n", A, square[channel].timer, square[channel].period);
             break;
         }
+
+        // CRRR RRRR Triangle :: Counter, Reload counter
+        case 0x4008: {
+
+            triangle.counter = (D & 0x80) ? 1 : 0;
+            triangle.reload  = (D & 0x7F);
+            break;
+        }
+
+        // TIMER
+        case 0x400A: {
+
+            triangle.tmp = D;
+            break;
+        }
+
+        // TIMER + PERIOD
+        case 0x400B: {
+
+            triangle.timer  = (D & 7)*256 + triangle.tmp;
+            triangle.period = D >> 3;
+            triangle.reload_flag = 1;
+            break;
+        }
     }
 
+    // 1CPU = 1APU
     // ----------------
+
+    // Высота тона
+    if (triangle.timer_c > 0) {
+        triangle.timer_c--;
+    } else {
+        triangle.timer_c = triangle.timer;
+        triangle.phase++;
+        triangle.phase &= 31;
+    }
 
     // 2CPU = 1APU
     if (eapu_cycle & 1) {
@@ -170,22 +211,58 @@ uint8_t TB::eApu(uint16_t A, uint8_t D, uint8_t I, int W, int R)
                 }
             }
 
-            // -----------------------------------------------------------------
-            // Уменьшение счетчика Period
-            // --------------------------------------
-
-            if (apu_frame_half) {
-
-                // Уменьшая до 0, останавливается нота
-                if (square[i].period) square[i].period--;
+            // Уменьшая до 0, останавливается нота
+            if (apu_frame_half && square[i].period) {
+                square[i].period--;
             }
         }
 
-        // Вывод в WAV файл
-        if (wav_timer >= 10) {
+        // -----------------------------------------------------------------
+        // Треугольник
+        // -----------------------------------------------------------------
+
+        // RELOAD уменьшается каждые 1/4 сек
+        if (triangle.counter && apu_frame_quart) {
+            if (triangle.reload_c) {
+                triangle.reload_c--;
+            }
+        }
+
+        // Текущий звук
+        triangle.out = EAPU_tri[triangle.phase & 31];
+
+        // Заглушить канал 1) если reload_counter достиг 0, 2) если период достиг 0
+        if ((triangle.counter && triangle.reload_c == 0) || triangle.period == 0) {
+            triangle.out = 0;
+        }
+
+        // Применить RELOAD counter после 1 FPS
+        // Причем, если Counter есть, то не
+        if (apu_frame && triangle.reload_flag) {
+
+            triangle.reload_c    = triangle.reload;
+            triangle.reload_flag = triangle.counter;
+        }
+
+        // Уменьшая до 0, останавливается
+        if (apu_frame_half && triangle.period) {
+            triangle.period--;
+        }
+
+        // -----------------------------------------------------------------
+        // Вывод в WAV файл [20x2=40]
+        // -----------------------------------------------------------------
+
+        if (wav_timer >= 20) {
 
             wav_timer = 0;
-            uint8_t bv = (8*square[0].out + 8*square[1].out);
+
+            // https://www.nesdev.org/wiki/APU_Mixer
+            float out_square = (float)(16*square[0].out + 16*square[1].out) / 16.0;
+            float sqr_out    = 95.88 / (100 + (8128 / out_square));
+            float tnd_out    = 159 / (100 + (1 / ((float)triangle.out / 8227.0)));
+
+            uint8_t bv = 255*(tnd_out + sqr_out);
             fwrite(&bv, 1, 1, wave_fp);
             wav_size++;
 

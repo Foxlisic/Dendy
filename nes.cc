@@ -10,7 +10,7 @@
 // Порты $4000-$4FFFF
 #define DEBUG2 0
 // Отладка APU
-#define DEBUG3 1
+#define DEBUG3 0
 // ---------------------------
 
 #include "nes_decl.h"

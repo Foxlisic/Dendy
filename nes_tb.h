@@ -62,8 +62,9 @@ protected:
     uint        wav_size = 0;
     int         wav_timer = 0;
 
-    eAPU_square square[2];
-    int         eapu_cycle = 0;
+    eAPU_square     square[2];
+    eAPU_triangle   triangle;
+    int             eapu_cycle = 0;
 
     // Модули
     Vppu*       ppu;

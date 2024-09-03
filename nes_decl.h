@@ -175,6 +175,7 @@ static const int EAPU_Length[32] = {
 };
 
 static const int EAPU_duty[4] = {0x01, 0x03, 0x0F, 0xFC};
+static const int EAPU_tri[32] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
 
 struct eAPU_square {
 
@@ -183,4 +184,11 @@ struct eAPU_square {
     int timer,   period, tmp;
     int counter, ac, out, decay;
     int env_c,   bitp;
+};
+
+struct eAPU_triangle {
+
+    int counter, reload, timer, tmp, period;
+    int reload_flag, reload_c, timer_c;
+    int phase, out;
 };
