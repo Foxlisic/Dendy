@@ -100,9 +100,10 @@ pll PLL0
 // Джойстик сега
 // --------------------------------------------------------------
 
-wire [11:0] joy1;
-wire [11:0] joy2;
+reg [11:0] joy1;
+reg [11:0] joy2;
 
+/*
 joy SegaJoy1
 (
     .clock      (clock_25),
@@ -115,6 +116,44 @@ joy SegaJoy1
     .pin_d7     ( GPIO_1[22]),
     .joy        (joy1)
 );
+*/
+
+// ---------------------------------------------------------------------
+// Данные с джойстиков (с клавиатуры)
+// https://ru.wikipedia.org/wiki/%D0%A1%D0%BA%D0%B0%D0%BD-%D0%BA%D0%BE%D0%B4
+// ---------------------------------------------------------------------
+
+reg kbd_press = 1'b1;
+
+/* Используются AT-коды клавиатуры */
+always @(posedge clock_50) begin
+
+    if (ps2_hit) begin
+
+        /* Код отпущенной клавиши */
+        if (ps2_data == 8'hF0) kbd_press <= 1'b0;
+        else begin
+
+            case (ps2_data[6:0])
+
+                /* Z (B)   */ 8'h22: joy1[0] <= kbd_press;
+                /* X (A)   */ 8'h1A: joy1[1] <= kbd_press;
+                /* C (SEL) */ 8'h21: joy1[2] <= kbd_press;
+                /* V (STA) */ 8'h2A: joy1[3] <= kbd_press;
+                /* UP      */ 8'h75: joy1[4] <= kbd_press;
+                /* DOWN    */ 8'h72: joy1[5] <= kbd_press;
+                /* LEFT    */ 8'h6B: joy1[6] <= kbd_press;
+                /* RIGHT   */ 8'h74: joy1[7] <= kbd_press;
+
+            endcase
+
+            kbd_press <= 1'b1;
+
+        end
+
+    end
+
+end
 
 // Маппер
 // --------------------------------------------------------------
@@ -158,6 +197,10 @@ wire [ 7:0] prgi = w_rom ? prg_in : (w_ram ? ram_in : 8'hFF);
 // Чтение CHR-ROM или CHR-RAM
 wire [7:0]  chrd = chra < 14'h2000 ? chr_i  : (chra < 14'h3F00 ? vrm_i   : 8'hFF);
 wire [7:0]  vidi = vida < 14'h2000 ? chr_in : (vida < 14'h3F00 ? vidi_in : 8'hFF);
+
+// Клавиатура
+wire [7:0] ps2_data;
+wire       ps2_hit;
 
 // CPU Central Processing Unix
 // ---------------------------------------------------------------------
@@ -224,6 +267,18 @@ ppu DendyPPU
     .x2i        (x2i),
     .x2o        (x2o),
     .x2w        (x2w),
+);
+
+// Контроллер PS/2 и джойстиков
+// ---------------------------------------------------------------------
+
+keyboard KeyboardUnit
+(
+    .CLOCK_50           (clock_50),     // Тактовый генератор на 50 Мгц
+    .PS2_CLK            (PS2_CLK),      // Таймингс PS/2
+    .PS2_DAT            (PS2_DAT),      // Данные с PS/2
+    .received_data      (ps2_data),     // Принятые данные
+    .received_data_en   (ps2_hit)       // Нажата клавиша
 );
 
 // Программная память :: 256K MAX
@@ -302,3 +357,4 @@ endmodule
 
 `include "../cpu.v"
 `include "../ppu.v"
+`include "../keyboard.v"

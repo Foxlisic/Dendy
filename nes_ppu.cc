@@ -26,9 +26,7 @@ int TB::eppu_rw(int A, int I, int R, int W, int D)
         } else if (R) {
 
             I = (_ppu_j1 & 1) | 0x40;
-
             _ppu_j1 >>= 1;
-            _ppu_j2 >>= 1;
         }
     }
     // Запись или чтение в видеорегистры

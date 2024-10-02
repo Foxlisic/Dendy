@@ -261,7 +261,7 @@ else if (ce) begin
             // Для STA запретить RD, но разрешить WR
             casex (I) 8'b100_xxx_01, 8'b100_xx1_x0: rd <= 1'b0; endcase
 
-            // INC, DEC, STA, Сдвиговые всегда добавляют +1Т к ABS,XY; IND,Y
+            // INC, DEC, STA, STX, STY, ASL, LSR, ROL, ROR добавляют +1Т к ABS,XY; IND,Y
             casex (I) 8'b100xxxxx, 8'b11xxx110, 8'b0xxxx110: cnext <= 1; endcase
 
         end
