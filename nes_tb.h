@@ -88,7 +88,7 @@ public:
         chrrom  = (uint8_t*) malloc(128*1024);
         videom  = (uint8_t*) malloc(64*1024);
 
-        scale        = 1;           // Удвоение пикселей
+        scale        = 2;           // Удвоение пикселей
         width        = 640;         // Ширина экрана
         height       = 480;         // Высота экрана
         frame_length = (1000/20);   // 20 FPS
@@ -228,7 +228,7 @@ public:
                     (cpu->W ? ">" : " "),
                     cpu->D,
                     // --
-                    cpu->_a, cpu->_x, cpu->_y, cpu->_p,
+                    cpu->a, cpu->x, cpu->y, cpu->p,
                     //
                     (PPU_MODEL == 1 ? _ppu_dm : ppu->vida),
                     (ppu->vidw ? '~' : ' '),
