@@ -1,0 +1,253 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Fri Aug 30 15:32:25 2024
+[*]
+[dumpfile] "/home/fox/dev/11_nes/07_dendy_c5/tb.vcd"
+[dumpfile_mtime] "Fri Aug 30 15:30:47 2024"
+[dumpfile_size] 378338
+[savefile] "/home/fox/dev/11_nes/07_dendy_c5/tb.gtkw"
+[timestart] 36368
+[size] 1920 1008
+[pos] -1 -1
+*-9.000002 37395 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb.
+[sst_width] 319
+[signals_width] 242
+[sst_expanded] 1
+[sst_vpaned_height] 332
+@28
+tb.DendyPPU.clock25
+tb.DendyCPU.nmi
+[color] 2
+tb.DendyPPU.ce_ppu
+[color] 3
+tb.DendyPPU.ce_cpu
+tb.DendyPPU.ct_cpu[1:0]
+@800200
+-CPU
+@28
+[color] 2
+tb.DendyCPU.m0
+@22
+tb.DendyCPU.A[15:0]
+tb.DendyCPU.pc[15:0]
+[color] 2
+tb.DendyCPU.I[7:0]
+tb.DendyCPU.D[7:0]
+@28
+tb.DendyCPU.R
+tb.DendyCPU.W
+@1000200
+-CPU
+@800200
+-STATE
+@28
+[color] 3
+tb.DendyCPU.m
+@22
+tb.DendyCPU.t[4:0]
+@28
+tb.DendyCPU.n[2:0]
+@22
+tb.DendyCPU.opcode[7:0]
+tb.DendyCPU.tr[7:0]
+tb.DendyCPU.itr[15:0]
+@28
+tb.DendyCPU.cnext
+tb.DendyCPU.cout
+tb.DendyCPU.nmitr
+@1000200
+-STATE
+@c00200
+-PRG-MEM
+@22
+tb.DendyPPU.cpu_a[15:0]
+@28
+tb.DendyPPU.cpu_r
+@c00022
+tb.DendyPPU.cpu_i[7:0]
+@28
+(0)tb.DendyPPU.cpu_i[7:0]
+(1)tb.DendyPPU.cpu_i[7:0]
+(2)tb.DendyPPU.cpu_i[7:0]
+(3)tb.DendyPPU.cpu_i[7:0]
+(4)tb.DendyPPU.cpu_i[7:0]
+(5)tb.DendyPPU.cpu_i[7:0]
+(6)tb.DendyPPU.cpu_i[7:0]
+(7)tb.DendyPPU.cpu_i[7:0]
+@1401200
+-group_end
+@28
+tb.DendyPPU.cpu_w
+@22
+tb.DendyPPU.cpu_o[7:0]
+tb.DendyPPU.prga[15:0]
+tb.DendyPPU.prgd[7:0]
+tb.DendyPPU.prgi[7:0]
+@28
+tb.DendyPPU.prgw
+@1401200
+-PRG-MEM
+@800200
+-OAM2
+@28
+tb.DendyPPU.dma
+@22
+tb.DendyPPU.oam2c[7:0]
+tb.DendyPPU.oam2a[7:0]
+tb.DendyPPU.oam2i[7:0]
+tb.DendyPPU.oam2o[7:0]
+@28
+tb.DendyPPU.oam2w
+@1000200
+-OAM2
+@800200
+-PPU
+@22
+tb.DendyPPU.cpu_i[7:0]
+tb.DendyPPU.cpu_o[7:0]
+@c00022
+tb.DendyPPU.va[14:0]
+@28
+(0)tb.DendyPPU.va[14:0]
+(1)tb.DendyPPU.va[14:0]
+(2)tb.DendyPPU.va[14:0]
+(3)tb.DendyPPU.va[14:0]
+(4)tb.DendyPPU.va[14:0]
+(5)tb.DendyPPU.va[14:0]
+(6)tb.DendyPPU.va[14:0]
+(7)tb.DendyPPU.va[14:0]
+(8)tb.DendyPPU.va[14:0]
+(9)tb.DendyPPU.va[14:0]
+(10)tb.DendyPPU.va[14:0]
+(11)tb.DendyPPU.va[14:0]
+(12)tb.DendyPPU.va[14:0]
+(13)tb.DendyPPU.va[14:0]
+(14)tb.DendyPPU.va[14:0]
+@1401200
+-group_end
+@c00022
+tb.DendyPPU.t[14:0]
+@28
+(0)tb.DendyPPU.t[14:0]
+(1)tb.DendyPPU.t[14:0]
+(2)tb.DendyPPU.t[14:0]
+(3)tb.DendyPPU.t[14:0]
+(4)tb.DendyPPU.t[14:0]
+(5)tb.DendyPPU.t[14:0]
+(6)tb.DendyPPU.t[14:0]
+(7)tb.DendyPPU.t[14:0]
+(8)tb.DendyPPU.t[14:0]
+(9)tb.DendyPPU.t[14:0]
+(10)tb.DendyPPU.t[14:0]
+(11)tb.DendyPPU.t[14:0]
+(12)tb.DendyPPU.t[14:0]
+(13)tb.DendyPPU.t[14:0]
+(14)tb.DendyPPU.t[14:0]
+@1401200
+-group_end
+@28
+tb.DendyPPU.oam_hit
+tb.DendyPPU.finex[2:0]
+@22
+tb.DendyPPU.ctrl0[7:0]
+tb.DendyPPU.ctrl1[7:0]
+@28
+tb.DendyPPU.joy_ff
+@23
+tb.DendyPPU.joy1_in[23:0]
+@1000200
+-PPU
+@800200
+-VIDA
+@22
+tb.DendyPPU.vida[14:0]
+tb.DendyPPU.vidch[7:0]
+tb.DendyPPU.vidi[7:0]
+tb.DendyPPU.vido[7:0]
+@28
+tb.DendyPPU.vidw
+@1000200
+-VIDA
+@800200
+-REGS
+@c00022
+[color] 5
+tb.DendyCPU.a[7:0]
+@28
+[color] 5
+(0)tb.DendyCPU.a[7:0]
+[color] 5
+(1)tb.DendyCPU.a[7:0]
+[color] 5
+(2)tb.DendyCPU.a[7:0]
+[color] 5
+(3)tb.DendyCPU.a[7:0]
+[color] 5
+(4)tb.DendyCPU.a[7:0]
+[color] 5
+(5)tb.DendyCPU.a[7:0]
+[color] 5
+(6)tb.DendyCPU.a[7:0]
+[color] 5
+(7)tb.DendyCPU.a[7:0]
+@1401200
+-group_end
+@22
+[color] 5
+tb.DendyCPU.x[7:0]
+[color] 5
+tb.DendyCPU.y[7:0]
+[color] 5
+tb.DendyCPU.s[7:0]
+@c00022
+[color] 5
+tb.DendyCPU.p[7:0]
+@28
+[color] 5
+(0)tb.DendyCPU.p[7:0]
+[color] 5
+(1)tb.DendyCPU.p[7:0]
+[color] 5
+(2)tb.DendyCPU.p[7:0]
+[color] 5
+(3)tb.DendyCPU.p[7:0]
+[color] 5
+(4)tb.DendyCPU.p[7:0]
+[color] 5
+(5)tb.DendyCPU.p[7:0]
+[color] 5
+(6)tb.DendyCPU.p[7:0]
+[color] 5
+(7)tb.DendyCPU.p[7:0]
+@1401200
+-group_end
+@1000200
+-REGS
+@c00200
+-ALU
+@22
+tb.DendyCPU.alu[3:0]
+tb.DendyCPU.dst[7:0]
+tb.DendyCPU.src[7:0]
+tb.DendyCPU.ar[8:0]
+@c00022
+tb.DendyCPU.ap[7:0]
+@28
+(0)tb.DendyCPU.ap[7:0]
+(1)tb.DendyCPU.ap[7:0]
+(2)tb.DendyCPU.ap[7:0]
+(3)tb.DendyCPU.ap[7:0]
+(4)tb.DendyCPU.ap[7:0]
+(5)tb.DendyCPU.ap[7:0]
+(6)tb.DendyCPU.ap[7:0]
+(7)tb.DendyCPU.ap[7:0]
+@1401200
+-group_end
+@28
+tb.DendyCPU.dst_r[1:0]
+tb.DendyCPU.src_r[1:0]
+@1401200
+-ALU
+[pattern_trace] 1
+[pattern_trace] 0

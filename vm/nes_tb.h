@@ -72,6 +72,51 @@ protected:
 
 public:
 
+    // Декларации
+
+    // iface.cc :: Исполнение кода =============================================
+    uint8_t readv(uint16_t A);
+    uint8_t read(uint16_t A);
+    void    write(uint16_t A, uint8_t D);
+    int     tick();
+
+    // ppu.cc :: Видеопроцессор ================================================
+    int     eppu_rw(int A, int I, int R, int W, int D);
+    int     tick_emulated();
+
+    // apu.cc :: Звук ==========================================================
+    void    wavStart(const char* filename);
+    void    wavStop();
+    uint8_t eApu(uint16_t A, uint8_t D, uint8_t I, int W, int R);
+
+    // cpu.cc :: Процессор =====================================================
+
+    // Установка флагов
+    void    set_zero(int x);
+    void    set_overflow(int x);
+    void    set_carry(int x);
+    void    set_decimal(int x);
+    void    set_break(int x);
+    void    set_interrupt(int x);
+    void    set_sign(int x);
+
+    // Получение значений флагов
+    int     if_carry();
+    int     if_zero();
+    int     if_interrupt();
+    int     if_overflow();
+    int     if_sign();
+
+    // Работа со стеком
+    void     push(int x);
+    int      pull();
+    uint16_t readw(int addr);
+    int      effective(int addr);
+    int      branch(int addr, int iaddr);
+    void     brk();
+    void     nmi();
+    int      step();
+
     TB(int argc, char** argv)
     {
         FILE* fp;
@@ -99,7 +144,7 @@ public:
         }
 
         SDL_ClearError();
-        sdl_window          = SDL_CreateWindow("SDL2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, scale * width, scale * height, SDL_WINDOW_SHOWN);
+        sdl_window          = SDL_CreateWindow("Nintendo Entertainment System", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, scale * width, scale * height, SDL_WINDOW_SHOWN);
         sdl_renderer        = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC);
         screen_buffer       = (Uint32*) malloc(width * height * sizeof(Uint32));
         sdl_screen_texture  = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, width, height);
@@ -306,6 +351,7 @@ public:
         }
     }
 
+    // Прочесть сканкод с клавиатуры
     void kbd_scancode(int scan, int press)
     {
         switch (scan) {
@@ -360,6 +406,7 @@ public:
         pset(x-48-2, y-33-2, cl);
     }
 
+    // Дизассемблировать адрес
     void disam(uint16_t a)
     {
         int a1 = read(a),
@@ -384,48 +431,4 @@ public:
         }
     }
 
-    // Декларации
-
-    // iface.cc :: Исполнение кода
-    uint8_t readv(uint16_t A);
-    uint8_t read(uint16_t A);
-    void    write(uint16_t A, uint8_t D);
-    int     tick();
-
-    // ppu.cc :: Видеопроцессор
-    int     eppu_rw(int A, int I, int R, int W, int D);
-    int     tick_emulated();
-
-    // apu.cc :: Звук
-    void    wavStart(const char* filename);
-    void    wavStop();
-    uint8_t eApu(uint16_t A, uint8_t D, uint8_t I, int W, int R);
-
-    // cpu.cc :: Процессор
-
-    // Установка флагов
-    void    set_zero(int x);
-    void    set_overflow(int x);
-    void    set_carry(int x);
-    void    set_decimal(int x);
-    void    set_break(int x);
-    void    set_interrupt(int x);
-    void    set_sign(int x);
-
-    // Получение значений флагов
-    int     if_carry();
-    int     if_zero();
-    int     if_interrupt();
-    int     if_overflow();
-    int     if_sign();
-
-    // Работа со стеком
-    void     push(int x);
-    int      pull();
-    uint16_t readw(int addr);
-    int      effective(int addr);
-    int      branch(int addr, int iaddr);
-    void     brk();
-    void     nmi();
-    int      step();
 };

@@ -107,9 +107,10 @@ int TB::tick()
     if (ppu->x2w) { x2line[ppu->x2a] = ppu->x2o; }
     ppu->x2i = x2line[ppu->x2a];
 
-    // --------------------------------
+    // Установка значений маппера
+    // -------------------------------------------------------------------------
     ppu->mapper_chrw = (mapper == 2);
-    ppu->mapper_nt   = 0; // 2k | 4k NT
+    ppu->mapper_nt   = 0;               // 2k | 4k NT
 
     // --------------------------------
     ppu->chrd = readv(ppu->chra);
@@ -170,6 +171,7 @@ int TB::tick()
     }
 
     debug();
+
     cpu->clock = 0; cpu->eval();
     cpu->clock = 1; cpu->eval();
 

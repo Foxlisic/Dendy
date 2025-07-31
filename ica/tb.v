@@ -24,10 +24,10 @@ wire        ce_cpu, nmi;
 // ---------------------------------------------------------------------
 initial begin
 
-    $readmemh("pg.hex", prg, 16'h0000);
-    $readmemh("ch.hex", vmm, 16'h0000);
-    $readmemh("vm.hex", vmm, 16'h2000);
-    $readmemh("sp.hex", oam,  8'h00);
+    $readmemh("mem_pg.hex", prg, 16'h0000);
+    $readmemh("mem_ch.hex", vmm, 16'h0000);
+    $readmemh("mem_vm.hex", vmm, 16'h2000);
+    $readmemh("mem_sp.hex", oam,  8'h00);
 
     prg[16'hFFFA] = 8'h00; prg[16'hFFFB] = 8'h00; // NMI
     prg[16'hFFFC] = 8'h00; prg[16'hFFFD] = 8'h00; // RST
@@ -106,3 +106,6 @@ ppu DendyPPU
 );
 
 endmodule
+
+`include "../cpu.v"
+`include "../ppu.v"
