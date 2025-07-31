@@ -26,5 +26,5 @@ c5_pin_model_dump.txt
 nes
 obj_dir
 tb.gtkw
-tb.log
-tb.wav
+*.log
+*.wav

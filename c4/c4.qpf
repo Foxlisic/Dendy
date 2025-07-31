@@ -1,0 +1,5 @@
+QUARTUS_VERSION = "15.1"
+DATE = "19:18:41  June 20, 2024"
+
+# Revisions
+PROJECT_REVISION = "c4"
