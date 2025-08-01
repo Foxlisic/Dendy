@@ -62,7 +62,7 @@ module ppu
     output reg          ce_ppu,
     output reg          nmi,
     // --- Маппер ---
-    input               mapper_chrw,    // Разрешение записи в CHR-ROM
+    input               mapper_cw,       // Разрешение записи в CHR-ROM
     input               mapper_nt       // =0 2 NT; =1 4 NT
 );
 
@@ -641,7 +641,7 @@ begin
                                     // Для маппера UnROM возможна запись в CHR-TBL
                                     vida  <= nt_va;
                                     vido  <= cpu_o;
-                                    vidw  <= (va < 16'h3F00) && (va >= 16'h2000 || mapper_chrw);
+                                    vidw  <= (va < 16'h3F00) && (va >= 16'h2000 || mapper_cw);
 
                                 end
 

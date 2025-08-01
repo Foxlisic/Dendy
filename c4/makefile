@@ -1,4 +1,6 @@
 all: syn
+nes:
+	php ../utils/create.php nes ../roms/01_lode.nes m32.mif m8.mif 16k
 pgm:
 	quartus_pgm -m jtag -o "p;output_files/c4.sof"
 syn:
