@@ -21,31 +21,31 @@ module ppu
     output              hs,
     output              vs,
     // --- Процессор ---
-    input       [15:0]  cpu_a,      // Адрес
-    output reg  [ 7:0]  cpu_i,      // Данные чтения
-    input       [ 7:0]  cpu_o,      // Данные записи
-    input               cpu_w,      // Сигнал записи
-    input               cpu_r,      // Сигнал чтения
+    input       [15:0]  cpu_a,          // Адрес
+    output reg  [ 7:0]  cpu_i,          // Данные чтения
+    input       [ 7:0]  cpu_o,          // Данные записи
+    input               cpu_w,          // Сигнал записи
+    input               cpu_r,          // Сигнал чтения
     // --- PRG-ROM ---
-    output reg  [15:0]  prga,       // Адрес памяти RAM, PRG
-    input       [ 7:0]  prgi,       // Чтение из памяти
-    output reg  [ 7:0]  prgd,       // Запись в память
-    output reg          prgw,       // Сигнал записи
+    output reg  [15:0]  prga,           // Адрес памяти RAM, PRG
+    input       [ 7:0]  prgi,           // Чтение из памяти
+    output reg  [ 7:0]  prgd,           // Запись в память
+    output reg          prgw,           // Сигнал записи
     // --- Видеопамять ---
-    output reg  [14:0]  chra,       // Адрес в видеопамяти
-    input       [ 7:0]  chrd,       // Данные из видеопамяти
+    output reg  [14:0]  chra,           // Адрес в видеопамяти
+    input       [ 7:0]  chrd,           // Данные из видеопамяти
     // --- OAM R/W ---
-    output reg  [ 7:0]  oama,
-    input       [ 7:0]  oamd,
-    output reg  [ 7:0]  oam2a,
-    input       [ 7:0]  oam2i,
-    output reg  [ 7:0]  oam2o,
-    output reg          oam2w,
+    output reg  [ 7:0]  oama,           // Адрес на чтение
+    input       [ 7:0]  oamd,           // Чтение из OAM
+    output reg  [ 7:0]  oam2a,          // Адрес на запись
+    input       [ 7:0]  oam2i,          // Чтение данных из OAM
+    output reg  [ 7:0]  oam2o,          // Запись данных в OAM
+    output reg          oam2w,          // Сигнал записи
     // --- Запись в видеопамять ---
-    output reg  [14:0]  vida,
-    input       [ 7:0]  vidi,
-    output reg  [ 7:0]  vido,
-    output reg          vidw,
+    output reg  [14:0]  vida,           // Адрес видеопамяти
+    input       [ 7:0]  vidi,           // Чтение из видеопамяти
+    output reg  [ 7:0]  vido,           // Данные на запись
+    output reg          vidw,           // Сигнал записи
     // --- Джойстики ---
     input       [7:0]   joy1,
     input       [7:0]   joy2,
