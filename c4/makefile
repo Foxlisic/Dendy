@@ -1,6 +1,8 @@
+CRT=04_mario
+
 all: syn
 nes:
-	php ../utils/create.php nes ../roms/01_lode.nes m32.mif m8.mif 16k
+	php ../utils/create.php nes ../roms/$(CRT).nes m32.mif m8.mif
 pgm:
 	quartus_pgm -m jtag -o "p;output_files/c4.sof"
 syn:
@@ -10,6 +12,7 @@ syn:
 cdb:
 	quartus_cdb c4 -c c4 --update_mif
 	quartus_asm --read_settings_files=on --write_settings_files=off c4 -c c4
+	make pgm
 sta:
 	quartus_sta c4 -c c4
 clean:

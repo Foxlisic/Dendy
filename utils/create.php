@@ -8,7 +8,6 @@ switch ($argv[1])
         $in      = $argv[2];
         $mif_prg = $argv[3] ?? "mif_prg.mif";
         $mif_chr = $argv[4] ?? "mif_chr.mif";
-        $opts    = $argv[5] ?? "";
         // ----------
         $data    = file_get_contents($in);
         $prg_num = ord($data[4]);
@@ -18,7 +17,7 @@ switch ($argv[1])
         $chardat = substr($data, 16 + $prg_num * 16384, $chr_num * 8192);
 
         // Удвоение 16K -> 32K
-        if ($opts == '16k') { $program = $program.$program; $prg_num = 2; }
+        if ($prg_num == 1) { $program = $program.$program; $prg_num = 2; }
 
         file_put_contents($mif_prg, create_mif($program, $prg_num * 16384));
         file_put_contents($mif_chr, create_mif($chardat, $chr_num * 8192));

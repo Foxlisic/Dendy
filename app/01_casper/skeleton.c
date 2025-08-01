@@ -17,7 +17,7 @@ const unsigned char TEXT[] = {
 };
 
 const unsigned char PALLETE[] = {
-    0xF1, 0x00, 0x10, 0x20
+    0x0F, 0x00, 0x10, 0x20
 }; // black | gray | lt_gray | white
 
 void disablePPU(void)
