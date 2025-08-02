@@ -1,4 +1,5 @@
 DIR=../..
+CYC=c5
 all: com syn
 com:
 	cc65 skeleton.c
@@ -9,4 +10,4 @@ com:
 sta:
 	fceux skeleton.nes
 syn:
-	php $(DIR)/utils/create.php nes skeleton.nes $(DIR)/c4/m32.mif $(DIR)/c4/m8.mif
+	php $(DIR)/utils/create.php nes skeleton.nes $(DIR)/$(CYC)/m32.mif $(DIR)/$(CYC)/m8.mif
