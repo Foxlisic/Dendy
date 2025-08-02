@@ -12,6 +12,7 @@
 
 ; ------------------------------------------------------------------------------
 .segment "ZEROPAGE"
+
 ;no variables yet
 
 .segment "HEADER"
@@ -26,7 +27,8 @@
 ; ------------------------------------------------------------------------------
 .segment "STARTUP"
 
-    start:
+start:
+
     sei
     cld
     ldx #$40
@@ -41,17 +43,20 @@
     lda $2002
     bpl :-
     lda #$00
-    Blankram:			; puts zero in all CPU RAM
-    sta $00, x
-    sta $0100, x
-    sta $0200, x
-    sta $0300, x
-    sta $0400, x
-    sta $0500, x
-    sta $0600, x
-    sta $0700, x
+
+; puts zero in all CPU RAM
+BlankRam:
+
+    sta $00,x
+    sta $0100,x
+    sta $0200,x
+    sta $0300,x
+    sta $0400,x
+    sta $0500,x
+    sta $0600,x
+    sta $0700,x
     inx
-    bne Blankram
+    bne BlankRam
 :
     lda $2002
     bpl :-
@@ -59,27 +64,26 @@
 Isprites:
 
     jsr Blanksprite
-    lda #$00		;pushes all sprites from 200-2ff
-    sta $2003		;to the sprite memory
+    lda #$00            ; pushes all sprites from 200-2ff
+    sta $2003           ; to the sprite memory
     lda #$02
     sta $4014
-    jsr ClearNT		;puts zero in all PPU RAM
+    jsr ClearNT         ; puts zero in all PPU RAM
 
-MusicInit:			;turns music channels off
+MusicInit:              ; turns music channels off
 
     lda #0
     sta $4015
-
     lda #<(__STACK_START__+__STACKSIZE__)
-    sta	sp
-    lda	#>(__STACK_START__+__STACKSIZE__)
-    sta	sp+1            ; Set the c stack pointer
+    sta sp
+    lda #>(__STACK_START__+__STACKSIZE__)
+    sta sp+1            ; Set the c stack pointer
 
-    jsr	copydata
-    jsr	initlib
+    jsr copydata
+    jsr initlib
 
-    lda $2002		;reset the 'latch'
-    jmp _main		;jumps to main in c code
+    lda $2002           ; reset the 'latch'
+    jmp _main           ; jumps to main in c code
 
 _Blanksprite:
 Blanksprite:
@@ -87,8 +91,10 @@ Blanksprite:
     ldy #$40
     ldx #$00
     lda #$f8
-    Blanksprite2:		;puts all sprites off screen
-    sta $0200, x
+
+Blanksprite2:        ; puts all sprites off screen
+
+    sta $0200,x
     inx
     inx
     inx
@@ -105,11 +111,12 @@ ClearNT:
     sta $2006
     lda #$00
     sta $2006
-    lda #$00	;tile 00 is blank
+    lda #$00    ; tile 00 is blank
     ldy #$10
     ldx #$00
 
-BlankName:		;blanks screen
+; Blanks screen
+BlankName:
 
     sta $2007
     dex
@@ -121,7 +128,8 @@ BlankName:		;blanks screen
 nmi:
     inc _NMI_flag
     inc _frame_count
-    irq:
+
+irq:
     rti
 
 .segment "RODATA"
@@ -130,9 +138,9 @@ nmi:
 
 .segment "VECTORS"
 
-    .word nmi	;$fffa vblank nmi
-    .word start	;$fffc reset
-    .word irq	;$fffe irq / brk
+    .word nmi       ; $fffa vblank nmi
+    .word start     ; $fffc reset
+    .word irq       ; $fffe irq / brk
 
 .segment "CHARS"
 

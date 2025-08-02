@@ -8,20 +8,13 @@
 unsigned char NMI_flag;
 unsigned char frame_count;
 
-void disablePPU(void) { PPU_CTRL = 0x00; PPU_MASK = 0x00; }
-void enablePPU(void)  { PPU_CTRL = 0x90; PPU_MASK = 0x1E; }
-
-void loadPallete(void)
-{
-    PPU_ADDRESS = 0x3F;
-    PPU_ADDRESS = 0x00;
-}
+void PPU_off(void) { PPU_CTRL = 0x00; PPU_MASK = 0x00; }
+void PPU_on (void) { PPU_CTRL = 0x90; PPU_MASK = 0x1E; }
 
 void main(void)
 {
-    disablePPU();
-    loadPallete();
-    enablePPU();
+    PPU_off();
+    PPU_on();
 
     while (1)
     {

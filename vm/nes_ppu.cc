@@ -172,12 +172,12 @@ int TB::tick_emulated()
     int cycles = 1;
 
     // Эмулятор процессора
-    if (PPU_MODEL == 2) {
+    if (ppu_model == 2) {
 
         debug();
         cycles = step();
 
-    } else if (PPU_MODEL == 1) {
+    } else if (ppu_model == 1) {
 
         A = cpu->A;
         D = cpu->D;
@@ -368,7 +368,7 @@ int TB::tick_emulated()
             cpu->nmi = _ppu_c0 & 0x80 ? 1 : 0;
 
             // NMI запрос для эмулятора
-            if (PPU_MODEL == 2 && cpu->nmi) nmi();
+            if (ppu_model == 2 && cpu->nmi) nmi();
         }
 
         // Последняя строчка кадра, NMI заканчивается на 260-й

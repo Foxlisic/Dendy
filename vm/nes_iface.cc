@@ -60,7 +60,7 @@ uint8_t TB::read(uint16_t A)
         }
     }
 
-    if (PPU_MODEL == 2) {
+    if (ppu_model == 2) {
         return eppu_rw(A, I, 1, 0, 0);
     }
 
@@ -70,7 +70,7 @@ uint8_t TB::read(uint16_t A)
 // Писать можно только в память
 void TB::write(uint16_t A, uint8_t D)
 {
-    if (PPU_MODEL == 2) {
+    if (ppu_model == 2) {
         eppu_rw(A, 0, 0, 1, D);
     }
 
@@ -109,8 +109,8 @@ int TB::tick()
 
     // Установка значений маппера
     // -------------------------------------------------------------------------
-    ppu->mapper_chrw = (mapper == 2);
-    ppu->mapper_nt   = 0;               // 2k | 4k NT
+    ppu->mapper_cw = (mapper == 2);     // 2-й маппер может писать в CHR-ROM
+    ppu->mapper_nt = 0;                 // 2k | 4k NT
 
     // --------------------------------
     ppu->chrd = readv(ppu->chra);

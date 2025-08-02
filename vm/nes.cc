@@ -3,10 +3,6 @@
 #include "obj_dir/Vppu.h"
 
 // ---------------------------
-// =0 Verilog =1 PPU C++ =2 CPU+PPU C++
-#define PPU_MODEL 0
-// Дебаг CPU
-#define DEBUG1 0
 // Порты $4000-$4FFFF
 #define DEBUG2 0
 // Отладка APU

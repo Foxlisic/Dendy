@@ -48,6 +48,8 @@ protected:
     int         _ppu_bg[256];            // Одна линия (фон и спрайты)
 
     char        ds[256];
+    int         debug1_cpu = 0;
+    int         ppu_model  = 0;
 
     int         cnt_prg_rom;
     int         cnt_chr_rom;
@@ -178,70 +180,102 @@ public:
         _ppu_pa[24] = 0x0F; _ppu_pa[25] = 0x39; _ppu_pa[26] = 0x28; _ppu_pa[27] = 0x27;
         _ppu_pa[28] = 0x0F; _ppu_pa[29] = 0x30; _ppu_pa[30] = 0x30; _ppu_pa[31] = 0x30;
 
+        int i = 1;
+
         // Загрузка NES-файла
-        if (argc > 1) {
+        while (i < argc) {
 
-            fp = fopen(argv[1], "rb");
-            if (fp) {
+            // Загрузка параметра
+            if (argv[i][0] == '-')
+            {
+                switch (argv[i][1])
+                {
+                    // Загрузка CHR-ROM + VideoMemory
+                    case 'c':
 
-                fread(ines, 1, 16, fp);
+                        if (fp = fopen(argv[++i], "rb")) {
+                            fread(videom, 1, 16384, fp);
+                            fclose(fp);
+                        }
 
-                cnt_prg_rom = ines[4];
-                cnt_chr_rom = ines[5];
+                        break;
 
-                // Номер маппера
-                mapper      = (ines[6] >> 4) | (ines[7] & 0xF0);
-                prg_bank    = cnt_prg_rom - 1;
+                    // Загрузка OAM
+                    case 'o':
 
-                printf("PRGROM %d\n", cnt_prg_rom);
-                printf("CHRROM %d\n", cnt_chr_rom);
-                printf("Mapper %d\n", mapper);
+                        if (fp = fopen(argv[++i], "rb")) {
+                            fread(oam, 1, 256, fp);
+                            fclose(fp);
+                        }
 
-                // Читать программную память
-                fread(program, 1, cnt_prg_rom * 16384, fp);
+                        break;
 
-                if (cnt_prg_rom == 1) {
-                    for (int i = 0; i < 0x4000; i++) {
-                        program[i + 0x4000] = program[i];
-                    }
+                    // Установка уровня дебага процессора
+                    case 'd':
+
+                        debug1_cpu = argv[i][2] - '0';
+                        break;
+
+                    // Установка уровня эмулятора
+                    // =0 Чистый верилог
+                    // =1 PPU на C++
+                    // =2 PPU и CPU на C++
+                    case 'p':
+
+                        ppu_model = argv[i][2] - '0';
+                        break;
                 }
-
-                // Читать память CHR
-                if (cnt_chr_rom) {
-                    fread(chrrom, cnt_chr_rom, 8192, fp);
-                }
-
-                fclose(fp);
 
             } else {
 
-                printf("No file\n");
-                exit(1);
+                fp = fopen(argv[i], "rb");
+                if (fp) {
+
+                    fread(ines, 1, 16, fp);
+
+                    // Прочесть заголовок
+                    cnt_prg_rom = ines[4];
+                    cnt_chr_rom = ines[5];
+
+                    // Номер маппера
+                    mapper      = (ines[6] >> 4) | (ines[7] & 0xF0);
+                    prg_bank    = cnt_prg_rom - 1;
+
+                    printf("PRGROM %d\n", cnt_prg_rom);
+                    printf("CHRROM %d\n", cnt_chr_rom);
+                    printf("Mapper %d\n", mapper);
+
+                    // Читать программную память
+                    fread(program, 1, cnt_prg_rom * 16384, fp);
+
+                    // Дублировать 16К картридж до 32К
+                    if (cnt_prg_rom == 1) {
+                        for (int i = 0; i < 0x4000; i++) {
+                            program[i + 0x4000] = program[i];
+                        }
+                    }
+
+                    // Читать память CHR
+                    if (cnt_chr_rom) {
+                        fread(chrrom, cnt_chr_rom, 8192, fp);
+                    }
+
+                    fclose(fp);
+
+                } else {
+
+                    printf("ROM file error\n");
+                    exit(1);
+                }
             }
+
+            i++;
         }
 
-        // Загрузка CHR-ROM + VideoMemory
-        if (argc > 2) {
-
-            if (fp = fopen(argv[2], "rb")) {
-                fread(videom, 1, 16384, fp);
-                fclose(fp);
-            }
-
-        }
-
-        // Загрузка OAM
-        if (argc > 3) {
-
-            if (fp = fopen(argv[3], "rb")) {
-                fread(oam, 1, 256, fp);
-                fclose(fp);
-            }
-        }
-
+        // Установка PC на начало программы
         pc = program[0x7FFC] + 256*program[0x7FFD];
 
-        wavStart("tb.wav");
+        wavStart("nes.wav");
     }
 
     void debug()
@@ -252,21 +286,21 @@ public:
         }
 
         // Состояние ДО выполнения такта CPU
-        if (DEBUG1) {
+        if (debug1_cpu) {
 
-            if (PPU_MODEL == 2) {
+            if (ppu_model == 2) {
 
                 disam(pc);
                 printf("%04X %s\n", pc, ds);
 
-            } else if (cpu->ce && ((DEBUG1 == 2) && cpu->m0 || DEBUG1 == 1)) {
+            } else if (cpu->ce && ((debug1_cpu == 2) && cpu->m0 || debug1_cpu == 1)) {
 
                 disam(cpu->A);
 
                 // Cycles Bank:PC Read Write [A X Y P] Vida px py NMI
                 printf("%08X %c%1X:%04X %02X %s%02X [%02X %02X %02X %02X] V-%04X%c {%03d %03d} %c | %s\n",
                     cycles_count,
-                    (cpu->m0 && DEBUG1 == 1 ? '^' : ' '),
+                    (cpu->m0 && debug1_cpu == 1 ? '^' : ' '),
                     prg_bank,
                     cpu->A,
                     cpu->I,
@@ -275,7 +309,7 @@ public:
                     // --
                     cpu->a, cpu->x, cpu->y, cpu->p,
                     //
-                    (PPU_MODEL == 1 ? _ppu_dm : ppu->vida),
+                    (ppu_model == 1 ? _ppu_dm : ppu->vida),
                     (ppu->vidw ? '~' : ' '),
                     ppu->px,
                     ppu->py,
@@ -329,10 +363,10 @@ public:
                 for (int i = 0; i < 4096; i++) {
 
                     // Ограничить количество тактов :: 107210
-                    if (PPU_MODEL && count >= 107210) { SDL_Delay(1); break; }
+                    if (ppu_model && count >= 107210) { SDL_Delay(1); break; }
 
                     // Выполнить такт
-                    if (PPU_MODEL) count += tick_emulated(); else count += tick();
+                    if (ppu_model) count += tick_emulated(); else count += tick();
                 }
 
                 pticks = SDL_GetTicks();
