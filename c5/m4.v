@@ -2,9 +2,9 @@
 `timescale 1 ps / 1 ps
 // synopsys translate_on
 // -----------------------------------------------------------------------------
-module mem_oam(clock, a, d, q, w, ax, dx, wx, qx);
-input           clock;
-input    [ 7:0] a, ax;
+module m4(c, a, d, q, w, ax, dx, wx, qx);
+input           c;
+input    [11:0] a, ax;
 input    [ 7:0] d, dx;
 output   [ 7:0] q, qx;
 input           w, wx;
@@ -12,7 +12,7 @@ input           w, wx;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-    tri1      clock;
+    tri1      c;
     tri0      w, wx;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
@@ -20,7 +20,7 @@ input           w, wx;
 // -----------------------------------------------------------------------------
 altsyncram altsyncram_component
 (
-    .clock0           (clock),
+    .clock0           (c),
     .address_a        (a),
     .data_a           (d),
     .wren_a           (w),
@@ -52,7 +52,7 @@ defparam
     altsyncram_component.clock_enable_output_a      = "BYPASS",
     altsyncram_component.clock_enable_output_b      = "BYPASS",
     altsyncram_component.indata_reg_b               = "CLOCK0",
-    altsyncram_component.init_file                  = "mif_oam.mif",
+    altsyncram_component.init_file                  = "m4.mif",
     altsyncram_component.intended_device_family     = "Cyclone V",
     altsyncram_component.lpm_type                   = "altsyncram",
     altsyncram_component.operation_mode             = "BIDIR_DUAL_PORT",
@@ -62,10 +62,10 @@ defparam
     altsyncram_component.outdata_reg_b              = "UNREGISTERED",
     altsyncram_component.power_up_uninitialized     = "FALSE",
     altsyncram_component.ram_block_type             = "M10K",
-    altsyncram_component.numwords_a                 = 256,
-    altsyncram_component.numwords_b                 = 256,
-    altsyncram_component.widthad_a                  = 8,
-    altsyncram_component.widthad_b                  = 8,
+    altsyncram_component.numwords_a                 = 4096,
+    altsyncram_component.numwords_b                 = 4096,
+    altsyncram_component.widthad_a                  = 12,
+    altsyncram_component.widthad_b                  = 12,
     altsyncram_component.width_a                    = 8,
     altsyncram_component.width_b                    = 8,
     altsyncram_component.width_byteena_a            = 1,

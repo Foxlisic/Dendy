@@ -3,7 +3,7 @@ ROMS=../roms
 FILE=01_lode.nes
 
 all: syn pgm
-	./nes $(ROMS)/$(FILE) -d2 > nes.log
+	./nes $(ROMS)/$(FILE) > nes.log
 syn:
 	verilator -cc ../ppu.v > /dev/null
 	verilator -cc ../cpu.v > /dev/null

@@ -61,7 +61,7 @@ module de0
     output             VGA_HS,
     output             VGA_VS
 );
-
+// -----------------------------------------------------------------------------
 // MISO: Input Port
 assign SD_DATA[0] = 1'bZ;
 
@@ -81,27 +81,196 @@ assign HEX2 = 7'b1111111;
 assign HEX3 = 7'b1111111;
 assign HEX4 = 7'b1111111;
 assign HEX5 = 7'b1111111;
+// -----------------------------------------------------------------------------
+wire [15:0] cpu_a;
+wire [ 7:0] cpu_i, cpu_o;
+wire        cpu_w, cpu_r;
+wire        ce_cpu, nmi;
+wire        clock_25, clock_100, reset_n;
+// -----------------------------------------------------------------------------
+reg  [ 7:0] joy1, joy2;
+wire [ 3:0] vga_r, vga_g, vga_b;
+// -----------------------------------------------------------------------------
+wire [15:0] program_a;
+wire [ 7:0] program_i;
+wire [ 7:0] program_d;
+wire        program_w;
+// -----------------------------------------------------------------------------
+wire [ 7:0] sram_i;
+// -----------------------------------------------------------------------------
+wire [14:0] video_a;
+wire [ 7:0] video_i, video_d;
+wire [ 7:0] video_o;
+wire        video_w;
+// -----------------------------------------------------------------------------
+wire [14:0] chrom_a;
+wire [ 7:0] chrom_i;
+wire [ 7:0] chram_i;
+// -----------------------------------------------------------------------------
+wire [ 7:0] oam_a, oam_ax;
+wire [ 7:0] oam_i, oam_ix, oam_o;
+wire        oam_w;
+// -----------------------------------------------------------------------------
+wire [ 9:0] dub_a;
+wire [ 7:0] dub_i, dub_o;
+wire        dub_w;
+// -----------------------------------------------------------------------------
+// Запись в CHR-RxM  если позволяет маппер
+wire        w_video    = (video_a[14:13] == 2'b00);    // [0000-1FFF]
+wire        w_vdram    = (video_a[14:13] == 2'b01);    // [2000-3FFF]
+wire        w_rom      = (program_a >= 16'h8000);      // [8000-FFFF] ПЗУ
+wire        w_ram      = (program_a <  16'h2000);      // [0000-1FFF] ОЗУ
 
-// Генератор частот
-// --------------------------------------------------------------
-
-wire locked;
-wire clock_25;
-
+// Выбор источника данных для CHR-ROM; CHR-RAM
+wire [7:0]  program_in = w_rom ? program_i : (w_ram ? sram_i : 8'hFF);
+wire [7:0]  chrom_in   = chrom_a < 14'h2000 ? chrom_i : (chrom_a < 14'h3F00 ? chram_i : 8'hFF);
+wire [7:0]  video_in   = video_a < 14'h2000 ? video_i : (video_a < 14'h3F00 ? video_d : 8'hFF);
+// -----------------------------------------------------------------------------
+wire        rstn, clock_25;
+// -----------------------------------------------------------------------------
+reg [11:0]  joy1;
+reg [11:0]  joy2;
+// -----------------------------------------------------------------------------
 pll PLL0
 (
     .clkin      (CLOCK_50),
     .m25        (clock_25),
     .m50        (clock_50),
     .m100       (clock_100),
-    .locked     (locked)
+    .locked     (reset_n)
+);
+// -----------------------------------------------------------------------------
+cpu C1
+(
+    .clock      (clock_25),
+    .reset_n    (reset_n),
+    .ce         (ce_cpu),
+    .nmi        (nmi),
+    .A          (cpu_a),
+    .I          (cpu_i),
+    .D          (cpu_o),
+    .R          (cpu_r),
+    .W          (cpu_w)
+);
+// -----------------------------------------------------------------------------
+ppu C2
+(
+    .clock25    (clock_25),
+    .reset_n    (reset_n),
+    .ce_cpu     (ce_cpu),
+    .nmi        (nmi),
+    // -- VGA --
+    .r          (VGA_R),
+    .g          (VGA_G),
+    .b          (VGA_B),
+    .hs         (VGA_HS),
+    .vs         (VGA_VS),
+    // --- Процессор ---
+    .cpu_a      (cpu_a),
+    .cpu_i      (cpu_i),
+    .cpu_o      (cpu_o),
+    .cpu_r      (cpu_r),
+    .cpu_w      (cpu_w),
+    // --- Джойстики ---
+    .joy1       (joy1),
+    .joy2       (joy2),
+    // -- PROGRAM ROM --
+    .prga       (program_a),
+    .prgi       (program_in),
+    .prgd       (program_d),
+    .prgw       (program_w),
+    // -- VIDEO RAM --
+    .vida       (video_a),
+    .vidi       (video_in),
+    .vido       (video_o),
+    .vidw       (video_w),
+    // -- CHR-ROM --
+    .chra       (chrom_a),
+    .chrd       (chrom_in),
+    // -- OAM --
+    .oama       (oam_ax),
+    .oamd       (oam_ix),
+    .oam2a      (oam_a),
+    .oam2i      (oam_i),
+    .oam2o      (oam_o),
+    .oam2w      (oam_w),
+    // -- Удвоение 2Y --
+    .x2a        (dub_a),
+    .x2i        (dub_i),
+    .x2o        (dub_o),
+    .x2w        (dub_w),
+    // -- MAPPER --
+    .mapper_cw  (1'b0),
+    .mapper_nt  (1'b0),
+);
+// -----------------------------------------------------------------------------
+// 32Кб хранилище программ
+m32 PROGRAM
+(
+    .c  (clock_100),
+    .a  (program_a[14:0]),
+    .q  (program_i)
 );
 
-// Джойстик сега
-// --------------------------------------------------------------
+// 8Kb Хранилище тайлов (ROM/RAM)
+m8 CHRROM
+(
+    .c  (clock_100),
+    .a  (chrom_a[12:0]),
+    .q  (chrom_i),
+    // --
+    .ax (video_a[12:0]),
+    .qx (video_i),
+    .dx (video_o),
+    .wx (video_w & w_video)
+);
 
-reg [11:0] joy1;
-reg [11:0] joy2;
+// -----------------------------------------------------------------------------
+// 2Kb ОЗУ
+m2 SRAM
+(
+    .c  (clock_100),
+    .a  (program_a[10:0]),
+    .q  (sram_i),
+    .d  (program_d),
+    .w  (program_w & w_ram)
+);
+
+// 4Kb Name Table
+m4 VRAM
+(
+    .c  (clock_100),
+    .a  (chrom_a[11:0]),
+    .q  (chram_i),
+    // --
+    .ax (video_a[11:0]),
+    .qx (video_d),
+    .dx (video_o),
+    .wx (video_w && w_vdram)
+);
+
+// 1Kb OAM
+m1 OAM
+(
+    .c  (clock_100),
+    .a  (oam_a),
+    .q  (oam_i),
+    .d  (oam_o),
+    .w  (oam_w),
+    .ax (oam_ax),
+    .qx (oam_ix)
+);
+
+// 1Kb Скандаблер
+m1 DUB
+(
+    .c (clock_100),
+    .a (dub_a),
+    .q (dub_i),
+    .d (dub_o),
+    .w (dub_w)
+);
+// -----------------------------------------------------------------------------
 
 /*
 joy SegaJoy1
@@ -125,25 +294,26 @@ joy SegaJoy1
 
 reg kbd_press = 1'b1;
 
-/* Используются AT-коды клавиатуры */
+/*
+// Используются AT-коды клавиатуры
 always @(posedge clock_50) begin
 
     if (ps2_hit) begin
 
-        /* Код отпущенной клавиши */
+        // Код отпущенной клавиши
         if (ps2_data == 8'hF0) kbd_press <= 1'b0;
         else begin
 
             case (ps2_data[6:0])
 
-                /* Z (B)   */ 8'h22: joy1[0] <= kbd_press;
-                /* X (A)   */ 8'h1A: joy1[1] <= kbd_press;
-                /* C (SEL) */ 8'h21: joy1[2] <= kbd_press;
-                /* V (STA) */ 8'h2A: joy1[3] <= kbd_press;
-                /* UP      */ 8'h75: joy1[4] <= kbd_press;
-                /* DOWN    */ 8'h72: joy1[5] <= kbd_press;
-                /* LEFT    */ 8'h6B: joy1[6] <= kbd_press;
-                /* RIGHT   */ 8'h74: joy1[7] <= kbd_press;
+                8'h22: joy1[0] <= kbd_press; // Z(B)
+                8'h1A: joy1[1] <= kbd_press; // X(A)
+                8'h21: joy1[2] <= kbd_press; // C(SEL)
+                8'h2A: joy1[3] <= kbd_press; // V(STA)
+                8'h75: joy1[4] <= kbd_press; // UP
+                8'h72: joy1[5] <= kbd_press; // DOWN
+                8'h6B: joy1[6] <= kbd_press; // LEFT
+                8'h74: joy1[7] <= kbd_press; // RIGHT
 
             endcase
 
@@ -154,207 +324,10 @@ always @(posedge clock_50) begin
     end
 
 end
-
-// Маппер
-// --------------------------------------------------------------
-
-// assign LEDR = SW;
-
-wire        prg_size = SW[0];       // 0=16K 1=32K
-wire [3:0]  chr_bank = SW[3:1];     // 8 Номер CHR-TABLE
-wire [2:0]  prg_bank = SW[6:4];     // 8 Смещение PRG-TABLE [16K]
-
-wire        reset_n = RESET_N & locked;
-wire [7:0]  x2a, x2i, x2o, oama, oamd;
-wire [7:0]  chr_i, vrm_i;
-wire        x2w;
-
-// Чтение [CHR или VRAM]
-wire [ 7:0] prg_in;
-wire [ 7:0] ram_in;
-wire [14:0] chra;
-wire [15:0] prga;
-wire [14:0] vida;
-wire [ 7:0] vidi_in, chr_in;
-wire [ 7:0] oam2a, oam2i, oam2o, vido, prgd;
-wire        oam2w, vidw, prgw;
-
-// CPU
-wire [15:0] cpu_a;
-wire [ 7:0] cpu_i, cpu_o;
-wire        ce_cpu, nmi, cpu_w, cpu_r;
-
-// Переключается маппером [prg_bank]
-wire [16:0] prg_address = (prg_bank << 14) + (prg_size ? prga[14:0] : prga[13:0]);
-
-// Выбор источника памяти
-wire        w_rom = (prga >= 16'h8000);
-wire        w_ram = (prga <  16'h2000);
-
-// Либо чтение RAM, либо ROM
-wire [ 7:0] prgi = w_rom ? prg_in : (w_ram ? ram_in : 8'hFF);
-
-// Чтение CHR-ROM или CHR-RAM
-wire [7:0]  chrd = chra < 14'h2000 ? chr_i  : (chra < 14'h3F00 ? vrm_i   : 8'hFF);
-wire [7:0]  vidi = vida < 14'h2000 ? chr_in : (vida < 14'h3F00 ? vidi_in : 8'hFF);
-
-// Клавиатура
-wire [7:0] ps2_data;
-wire       ps2_hit;
-
-// CPU Central Processing Unix
-// ---------------------------------------------------------------------
-
-cpu DendyCPU
-(
-    .clock      (clock_25),
-    .reset_n    (reset_n),
-    .ce         (ce_cpu),
-    .nmi        (nmi),
-    .A          (cpu_a),
-    .I          (cpu_i),
-    .D          (cpu_o),
-    .R          (cpu_r),
-    .W          (cpu_w),
-);
-
-// PPU Pixel Processing Unix
-// ---------------------------------------------------------------------
-
-ppu DendyPPU
-(
-    .clock25    (clock_25),
-    .reset_n    (reset_n),
-    .ce_cpu     (ce_cpu),
-    .nmi        (nmi),
-    // -- VGA --
-    .r          (VGA_R),
-    .g          (VGA_G),
-    .b          (VGA_B),
-    .hs         (VGA_HS),
-    .vs         (VGA_VS),
-    // --- Процессор ---
-    .cpu_a      (cpu_a),
-    .cpu_i      (cpu_i),
-    .cpu_o      (cpu_o),
-    .cpu_r      (cpu_r),
-    .cpu_w      (cpu_w),
-    // --- Джойстики ---
-    .joy1       (joy1[7:0]),
-    .joy2       (joy2[7:0]),
-    // -- PROGRAM --
-    .prga       (prga),
-    .prgi       (prgi),
-    .prgd       (prgd),
-    .prgw       (prgw),
-    // -- VIDEO --
-    .vida       (vida),
-    .vidi       (vidi),
-    .vido       (vido),
-    .vidw       (vidw),
-    // -- CHR-ROM --
-    .chra       (chra),
-    .chrd       (chrd),
-    // -- OAM --
-    .oama       (oama),
-    .oamd       (oamd),
-    .oam2a      (oam2a),
-    .oam2i      (oam2i),
-    .oam2o      (oam2o),
-    .oam2w      (oam2w),
-    // -- Удвоение 2Y --
-    .x2a        (x2a),
-    .x2i        (x2i),
-    .x2o        (x2o),
-    .x2w        (x2w),
-);
-
-// Контроллер PS/2 и джойстиков
-// ---------------------------------------------------------------------
-
-keyboard KeyboardUnit
-(
-    .CLOCK_50           (clock_50),     // Тактовый генератор на 50 Мгц
-    .PS2_CLK            (PS2_CLK),      // Таймингс PS/2
-    .PS2_DAT            (PS2_DAT),      // Данные с PS/2
-    .received_data      (ps2_data),     // Принятые данные
-    .received_data_en   (ps2_hit)       // Нажата клавиша
-);
-
-// Программная память :: 256K MAX
-// ---------------------------------------------------------------------
-
-// 128K для памяти программ :: работает по мапперу
-mem_prg DendyPROGRAM
-(
-    .clock      (clock_100),
-    .a          (prg_address),
-    .q          (prg_in),
-);
-
-// 128K для знакогенератора [16x8]
-mem_chr DendyCHRROM
-(
-    .clock      (clock_100),
-    .a          ({chr_bank, chra[12:0]}),
-    .q          (chr_i),
-    .ax         ({chr_bank, vida[12:0]}),
-    .dx         (vido),
-    .wx         (vidw && vida[14:13] == 2'b00),   // 0000-1FFF
-    .qx         (chr_in),
-);
-
-// Подключение памяти :: 2K RAM + 4K NT + 1K OAM + 1K SCANLINE = 8K
-// ---------------------------------------------------------------------
-
-// 2K RAM
-mem_ram DendyRAM
-(
-    .clock      (clock_100),
-    .a          (prga[10:0]),
-    .d          (prgd),
-    .q          (ram_in),
-    .w          (prgw & w_ram),
-);
-
-// 4K для Name Tables
-mem_vrm DendyVideoRAM
-(
-    .clock      (clock_100),
-    .a          (chra[11:0]),
-    .q          (vrm_i),
-    .ax         (vida[11:0]),
-    .qx         (vidi_in),
-    .dx         (vido),
-    .wx         (vidw && vida[14:13] == 2'b01), // 2000-3FFF
-);
-
-// 1K для символов спрайтов
-mem_oam DendyOAM
-(
-    .clock      (clock_100),
-    .a          (oama),
-    .q          (oamd),
-    .ax         (oam2a),
-    .qx         (oam2i),
-    .dx         (oam2o),
-    .wx         (oam2w),
-);
-
-// 1K Для хранения сканлайна
-mem_x2 MemoryDoubleVGA
-(
-    .clock      (clock_100),
-    .a          (x2a),
-    .q          (x2i),
-    .d          (x2o),
-    .w          (x2w),
-);
+*/
 
 endmodule
 
-// ---------------------------------------------------------------------
-
 `include "../cpu.v"
 `include "../ppu.v"
-`include "../keyboard.v"
+`include "../kb.v"

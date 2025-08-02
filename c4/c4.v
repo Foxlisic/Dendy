@@ -168,16 +168,6 @@ m32 PROGRAM
     .q  (program_i)
 );
 
-// 2Kb ОЗУ
-m2ram SRAM
-(
-    .c  (clock_100),
-    .a  (program_a[10:0]),
-    .q  (sram_i),
-    .d  (program_d),
-    .w  (program_w & w_ram)
-);
-
 // 8Kb хранилище тайлов (ROM/RAM)
 m8 CHRROM
 (
@@ -190,9 +180,19 @@ m8 CHRROM
     .dx (video_o),
     .wx (video_w & w_video)
 );
+// -----------------------------------------------------------------------------
+// 2Kb ОЗУ
+m2 SRAM
+(
+    .c  (clock_100),
+    .a  (program_a[10:0]),
+    .q  (sram_i),
+    .d  (program_d),
+    .w  (program_w & w_ram)
+);
 
 // 2Kb Видеопамять тайлов
-m2chr VRAM
+m2 VRAM
 (
     .c  (clock_100),
     .a  (chrom_a[10:0]),
@@ -205,7 +205,7 @@ m2chr VRAM
 );
 
 // 1Kb OAM
-m1oam OAM
+m1 OAM
 (
     .c  (clock_100),
     .a  (oam_a),
@@ -217,7 +217,7 @@ m1oam OAM
 );
 
 // 1Kb Скандаблер
-m1oam DUB
+m1 DUB
 (
     .c (clock_100),
     .a (dub_a),

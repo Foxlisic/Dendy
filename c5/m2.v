@@ -2,7 +2,7 @@
 `timescale 1 ps / 1 ps
 // synopsys translate_on
 // -----------------------------------------------------------------------------
-module m2ram(c, a, d, q, w, ax, dx, wx, qx);
+module m2(c, a, d, q, w, ax, dx, wx, qx);
 input           c;
 input    [10:0] a, ax;
 input    [ 7:0] d, dx;
@@ -12,7 +12,7 @@ input           w, wx;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-    tri1      clock;
+    tri1      c;
     tri0      w, wx;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
@@ -52,8 +52,8 @@ defparam
     altsyncram_component.clock_enable_output_a      = "BYPASS",
     altsyncram_component.clock_enable_output_b      = "BYPASS",
     altsyncram_component.indata_reg_b               = "CLOCK0",
-    altsyncram_component.init_file                  = "m2r.mif",
-    altsyncram_component.intended_device_family     = "Cyclone IV E",
+    altsyncram_component.init_file                  = "m2.mif",
+    altsyncram_component.intended_device_family     = "Cyclone V",
     altsyncram_component.lpm_type                   = "altsyncram",
     altsyncram_component.operation_mode             = "BIDIR_DUAL_PORT",
     altsyncram_component.outdata_aclr_a             = "NONE",

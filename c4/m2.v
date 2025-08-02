@@ -2,8 +2,8 @@
 `timescale 1 ps / 1 ps
 // synopsys translate_on
 // -----------------------------------------------------------------------------
-module mem_ram(clock, a, d, q, w, ax, dx, wx, qx);
-input           clock;
+module m2(c, a, d, q, w, ax, dx, wx, qx);
+input           c;
 input    [10:0] a, ax;
 input    [ 7:0] d, dx;
 output   [ 7:0] q, qx;
@@ -20,7 +20,7 @@ input           w, wx;
 // -----------------------------------------------------------------------------
 altsyncram altsyncram_component
 (
-    .clock0           (clock),
+    .clock0           (c),
     .address_a        (a),
     .data_a           (d),
     .wren_a           (w),
@@ -52,8 +52,8 @@ defparam
     altsyncram_component.clock_enable_output_a      = "BYPASS",
     altsyncram_component.clock_enable_output_b      = "BYPASS",
     altsyncram_component.indata_reg_b               = "CLOCK0",
-    altsyncram_component.init_file                  = "mif_ram.mif",
-    altsyncram_component.intended_device_family     = "Cyclone V",
+    altsyncram_component.init_file                  = "m2r.mif",
+    altsyncram_component.intended_device_family     = "Cyclone IV E",
     altsyncram_component.lpm_type                   = "altsyncram",
     altsyncram_component.operation_mode             = "BIDIR_DUAL_PORT",
     altsyncram_component.outdata_aclr_a             = "NONE",
