@@ -1,4 +1,7 @@
+CRT=04_mario
 all:
+nes:
+	php ../utils/create.php nes ../roms/$(CRT).nes m32.mif m8.mif
 syn:
 	quartus_map --read_settings_files=on  --write_settings_files=off de0 -c de0
 	quartus_fit --read_settings_files=off --write_settings_files=off de0 -c de0

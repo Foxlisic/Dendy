@@ -89,7 +89,9 @@ wire        ce_cpu, nmi;
 wire        clock_25, clock_100, reset_n;
 // -----------------------------------------------------------------------------
 reg  [ 7:0] joy1, joy2;
-wire [ 3:0] vga_r, vga_g, vga_b;
+wire [ 7:0] kb_kbd;
+wire        kb_hit;
+reg         kb_press;
 // -----------------------------------------------------------------------------
 wire [15:0] program_a;
 wire [ 7:0] program_i;
@@ -111,7 +113,7 @@ wire [ 7:0] oam_a, oam_ax;
 wire [ 7:0] oam_i, oam_ix, oam_o;
 wire        oam_w;
 // -----------------------------------------------------------------------------
-wire [ 9:0] dub_a;
+wire [ 7:0] dub_a;
 wire [ 7:0] dub_i, dub_o;
 wire        dub_w;
 // -----------------------------------------------------------------------------
@@ -125,11 +127,6 @@ wire        w_ram      = (program_a <  16'h2000);      // [0000-1FFF] ОЗУ
 wire [7:0]  program_in = w_rom ? program_i : (w_ram ? sram_i : 8'hFF);
 wire [7:0]  chrom_in   = chrom_a < 14'h2000 ? chrom_i : (chrom_a < 14'h3F00 ? chram_i : 8'hFF);
 wire [7:0]  video_in   = video_a < 14'h2000 ? video_i : (video_a < 14'h3F00 ? video_d : 8'hFF);
-// -----------------------------------------------------------------------------
-wire        rstn, clock_25;
-// -----------------------------------------------------------------------------
-reg [11:0]  joy1;
-reg [11:0]  joy2;
 // -----------------------------------------------------------------------------
 pll PLL0
 (
@@ -287,44 +284,48 @@ joy SegaJoy1
 );
 */
 
-// ---------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Данные с джойстиков (с клавиатуры)
-// https://ru.wikipedia.org/wiki/%D0%A1%D0%BA%D0%B0%D0%BD-%D0%BA%D0%BE%D0%B4
-// ---------------------------------------------------------------------
+// https://ru.wikipedia.org/wiki/Скан-код
+// -----------------------------------------------------------------------------
 
-reg kbd_press = 1'b1;
+kb K1
+(
+    .clock  (clock_25),
+    .reset_n(reset_n),
+    .ps_clk (PS2_CLK),
+    .ps_dat (PS2_DAT),
+    .kbd    (kb_kbd),
+    .hit    (kb_hit)
+);
 
-/*
 // Используются AT-коды клавиатуры
-always @(posedge clock_50) begin
+always @(posedge clock_25)
+if (!reset_n) begin kb_press <= 1'b1; end
+else if (kb_hit) begin
 
-    if (ps2_hit) begin
+    // Код отпущенной клавиши
+    if (kb_kbd == 8'hF0) kb_press <= 1'b0;
+    else begin
 
-        // Код отпущенной клавиши
-        if (ps2_data == 8'hF0) kbd_press <= 1'b0;
-        else begin
+        case (kb_kbd)
 
-            case (ps2_data[6:0])
+            8'h22: joy1[0] <= kb_press; // Z(B)
+            8'h1A: joy1[1] <= kb_press; // X(A)
+            8'h21: joy1[2] <= kb_press; // C(SEL)
+            8'h2A: joy1[3] <= kb_press; // V(STA)
+            8'h75: joy1[4] <= kb_press; // UP
+            8'h72: joy1[5] <= kb_press; // DOWN
+            8'h6B: joy1[6] <= kb_press; // LEFT
+            8'h74: joy1[7] <= kb_press; // RIGHT
 
-                8'h22: joy1[0] <= kbd_press; // Z(B)
-                8'h1A: joy1[1] <= kbd_press; // X(A)
-                8'h21: joy1[2] <= kbd_press; // C(SEL)
-                8'h2A: joy1[3] <= kbd_press; // V(STA)
-                8'h75: joy1[4] <= kbd_press; // UP
-                8'h72: joy1[5] <= kbd_press; // DOWN
-                8'h6B: joy1[6] <= kbd_press; // LEFT
-                8'h74: joy1[7] <= kbd_press; // RIGHT
+        endcase
 
-            endcase
-
-            kbd_press <= 1'b1;
-
-        end
+        kb_press <= 1'b1;
 
     end
 
 end
-*/
 
 endmodule
 
