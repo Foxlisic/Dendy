@@ -142,6 +142,11 @@ TB::TB(int argc, char** argv)
                 printf("CHRROM %d\n", cnt_chr_rom);
                 printf("Mapper %d\n", mapper);
 
+                // 2-й маппер пишет в CHR-ROM
+                if (mapper == 2) {
+                    mapper_cw = 1;
+                }
+
                 // Читать программную память
                 fread(program, 1, cnt_prg_rom * 16384, fp);
 

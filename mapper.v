@@ -12,9 +12,8 @@ module mapper
     input               cpu_w,
     // --
     output reg          cw,
-    output reg          nt,
     output reg          cbank,
-    output     [17:0]   program_m
+    output      [17:0]  program_m
 );
 
 reg [3:0] pbank;
@@ -31,7 +30,6 @@ if (reset_n == 0) begin
 
     cbank   <= 2'b00;
     cw      <= 1'b0;
-    nt      <= 1'b0;
     pbank   <= 3'b000;
 
 end else begin

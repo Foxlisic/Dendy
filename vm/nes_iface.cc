@@ -109,8 +109,8 @@ int TB::tick()
 
     // Установка значений маппера
     // -------------------------------------------------------------------------
-    ppu->mapper_cw = (mapper == 2);     // 2-й маппер может писать в CHR-ROM
-    ppu->mapper_nt = 0;                 // 2k | 4k NT
+    ppu->mapper_cw = mapper_cw;
+    ppu->mapper_nt = mapper_nt;
 
     // --------------------------------
     ppu->chrd = readv(ppu->chra);

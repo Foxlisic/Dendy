@@ -120,7 +120,8 @@ wire [ 7:0] dub_i, dub_o;
 wire        dub_w;
 // -----------------------------------------------------------------------------
 wire [ 1:0] cbank;
-wire        mapper_cw, mapper_nt;
+wire [ 1:0] mapper_nt = 2'b01;
+wire        mapper_cw;
 // -----------------------------------------------------------------------------
 // Запись в CHR-RxM  если позволяет маппер
 wire        w_video    = (video_a[14:13] == 2'b00);    // [0000-1FFF]
@@ -204,7 +205,7 @@ ppu C2
     .x2w        (dub_w),
     // -- MAPPER --
     .mapper_cw  (mapper_cw),
-    .mapper_nt  (mapper_nt),
+    .mapper_nt  (mapper_nt),        // 01 Duck Tales 2
 );
 // Обработчик различных мапперов
 // -----------------------------------------------------------------------------
@@ -223,7 +224,6 @@ mapper M1
     .cpu_w      (cpu_w),
     // Параметры картриджа
     .cw         (mapper_cw),
-    .nt         (mapper_nt),
     .cbank      (cbank),
     .program_a  (program_a),
     .program_m  (program_m),

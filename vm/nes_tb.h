@@ -56,6 +56,8 @@ protected:
 
     int         mapper      = 0;
     int         mapper_chrw = 1;
+    int         mapper_cw   = 0;
+    int         mapper_nt   = 3;
     int         prg_bank    = 0;
     int         _cpu_m0     = 0;
 
