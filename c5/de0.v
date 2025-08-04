@@ -86,6 +86,7 @@ wire [15:0] cpu_a;
 wire [ 7:0] cpu_i, cpu_o;
 wire        cpu_w, cpu_r;
 wire        ce_cpu, nmi;
+wire [ 1:0] ct_cpu;
 wire        clock_25, clock_100, reset_n;
 // -----------------------------------------------------------------------------
 reg  [ 7:0] joy1, joy2;
@@ -94,6 +95,7 @@ wire        kb_hit;
 reg         kb_press;
 // -----------------------------------------------------------------------------
 wire [15:0] program_a;
+wire [17:0] program_m;
 wire [ 7:0] program_i;
 wire [ 7:0] program_d;
 wire        program_w;
@@ -116,6 +118,9 @@ wire        oam_w;
 wire [ 7:0] dub_a;
 wire [ 7:0] dub_i, dub_o;
 wire        dub_w;
+// -----------------------------------------------------------------------------
+wire [ 1:0] cbank;
+wire        mapper_cw, mapper_nt;
 // -----------------------------------------------------------------------------
 // Запись в CHR-RxM  если позволяет маппер
 wire        w_video    = (video_a[14:13] == 2'b00);    // [0000-1FFF]
@@ -155,6 +160,7 @@ ppu C2
     .clock25    (clock_25),
     .reset_n    (reset_n),
     .ce_cpu     (ce_cpu),
+    .ct_cpu     (ct_cpu),
     .nmi        (nmi),
     // -- VGA --
     .r          (VGA_R),
@@ -197,15 +203,37 @@ ppu C2
     .x2o        (dub_o),
     .x2w        (dub_w),
     // -- MAPPER --
-    .mapper_cw  (1'b0),
-    .mapper_nt  (1'b0),
+    .mapper_cw  (mapper_cw),
+    .mapper_nt  (mapper_nt),
+);
+// Обработчик различных мапперов
+// -----------------------------------------------------------------------------
+mapper M1
+(
+    // Конфигурация
+    .num        (8'h02),            // 02h UnROM
+    .max        (4'b0111),          // 8 банков памяти
+    // Интерфейс
+    .clock      (clock_25),
+    .reset_n    (reset_n),
+    .ce_cpu     (ce_cpu),
+    .ct_cpu     (ct_cpu),
+    .cpu_a      (cpu_a),
+    .cpu_o      (cpu_o),
+    .cpu_w      (cpu_w),
+    // Параметры картриджа
+    .cw         (mapper_cw),
+    .nt         (mapper_nt),
+    .cbank      (cbank),
+    .program_a  (program_a),
+    .program_m  (program_m),
 );
 // -----------------------------------------------------------------------------
 // 32Кб хранилище программ
 m32 PROGRAM
 (
     .c  (clock_100),
-    .a  (program_a[14:0]),
+    .a  (program_m),
     .q  (program_i)
 );
 
@@ -213,15 +241,14 @@ m32 PROGRAM
 m8 CHRROM
 (
     .c  (clock_100),
-    .a  (chrom_a[12:0]),
+    .a  ({cbank, chrom_a[12:0]}),
     .q  (chrom_i),
     // --
-    .ax (video_a[12:0]),
+    .ax ({cbank, video_a[12:0]}),
     .qx (video_i),
     .dx (video_o),
     .wx (video_w & w_video)
 );
-
 // -----------------------------------------------------------------------------
 // 2Kb ОЗУ
 m2 SRAM
@@ -332,3 +359,4 @@ endmodule
 `include "../cpu.v"
 `include "../ppu.v"
 `include "../kb.v"
+`include "../mapper.v"

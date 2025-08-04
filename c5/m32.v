@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 module m32(c, a, d, q, w, ax, dx, wx, qx);
 input           c;
-input    [14:0] a, ax;
+input    [17:0] a, ax;
 input    [ 7:0] d, dx;
 output   [ 7:0] q, qx;
 input           w, wx;
@@ -62,10 +62,10 @@ defparam
     altsyncram_component.outdata_reg_b              = "UNREGISTERED",
     altsyncram_component.power_up_uninitialized     = "FALSE",
     altsyncram_component.ram_block_type             = "M10K",
-    altsyncram_component.numwords_a                 = 32768,
-    altsyncram_component.numwords_b                 = 32768,
-    altsyncram_component.widthad_a                  = 15,
-    altsyncram_component.widthad_b                  = 15,
+    altsyncram_component.numwords_a                 = 262144,
+    altsyncram_component.numwords_b                 = 262144,
+    altsyncram_component.widthad_a                  = 18,
+    altsyncram_component.widthad_b                  = 18,
     altsyncram_component.width_a                    = 8,
     altsyncram_component.width_b                    = 8,
     altsyncram_component.width_byteena_a            = 1,

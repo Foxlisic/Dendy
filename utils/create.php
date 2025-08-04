@@ -13,14 +13,17 @@ switch ($argv[1])
         $prg_num = ord($data[4]);
         $chr_num = ord($data[5]);
 
+        echo "PRG=$prg_num\n";
+        echo "CHR=$chr_num\n";
+
         $program = substr($data, 16,  $prg_num * 16384);
         $chardat = substr($data, 16 + $prg_num * 16384, $chr_num * 8192);
 
         // Удвоение 16K -> 32K
         if ($prg_num == 1) { $program = $program.$program; $prg_num = 2; }
 
-        file_put_contents($mif_prg, create_mif($program, $prg_num * 16384));
-        file_put_contents($mif_chr, create_mif($chardat, $chr_num * 8192));
+        if ($prg_num) file_put_contents($mif_prg, create_mif($program, $prg_num * 16384));
+        if ($chr_num) file_put_contents($mif_chr, create_mif($chardat, $chr_num * 8192));
         break;
 
     // Сбор в мультиигровку

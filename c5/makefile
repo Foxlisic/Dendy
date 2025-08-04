@@ -1,4 +1,6 @@
-CRT=04_mario
+#CRT=04_mario
+CRT=09_ducktales2
+
 all:
 nes:
 	php ../utils/create.php nes ../roms/$(CRT).nes m32.mif m8.mif

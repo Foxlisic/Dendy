@@ -1,8 +1,10 @@
 VLIB=/usr/share/verilator/include
 ROMS=../roms
-FILE=01_lode.nes
+#FILE=01_lode.nes
+FILE=09_ducktales2.nes
 
-all: syn pgm
+all: syn pgm run
+run:
 	./nes $(ROMS)/$(FILE) > nes.log
 syn:
 	verilator -cc ../ppu.v > /dev/null
