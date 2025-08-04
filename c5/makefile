@@ -1,5 +1,5 @@
-#CRT=04_mario
-CRT=09_ducktales2
+CRT=04_mario
+#CRT=09_ducktales2
 
 all:
 nes:

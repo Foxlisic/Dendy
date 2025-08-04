@@ -176,14 +176,14 @@ wire
 
 // Цвет пикселя
 wire [4:0]
-    sp0_i  = {1'b1, sp[0][17:16], sp[0][8 + sp0_x], sp[0][sp0_x]},
-    sp1_i  = {1'b1, sp[1][17:16], sp[1][8 + sp1_x], sp[1][sp1_x]},
-    sp2_i  = {1'b1, sp[2][17:16], sp[2][8 + sp2_x], sp[2][sp2_x]},
-    sp3_i  = {1'b1, sp[3][17:16], sp[3][8 + sp3_x], sp[3][sp3_x]},
-    sp4_i  = {1'b1, sp[4][17:16], sp[4][8 + sp4_x], sp[4][sp4_x]},
-    sp5_i  = {1'b1, sp[5][17:16], sp[5][8 + sp5_x], sp[5][sp5_x]},
-    sp6_i  = {1'b1, sp[6][17:16], sp[6][8 + sp6_x], sp[6][sp6_x]},
-    sp7_i  = {1'b1, sp[7][17:16], sp[7][8 + sp7_x], sp[7][sp7_x]};
+    sp0_i  = {1'b1, sp[0][17:16], sp[0][8+sp0_x], sp[0][sp0_x]},
+    sp1_i  = {1'b1, sp[1][17:16], sp[1][8+sp1_x], sp[1][sp1_x]},
+    sp2_i  = {1'b1, sp[2][17:16], sp[2][8+sp2_x], sp[2][sp2_x]},
+    sp3_i  = {1'b1, sp[3][17:16], sp[3][8+sp3_x], sp[3][sp3_x]},
+    sp4_i  = {1'b1, sp[4][17:16], sp[4][8+sp4_x], sp[4][sp4_x]},
+    sp5_i  = {1'b1, sp[5][17:16], sp[5][8+sp5_x], sp[5][sp5_x]},
+    sp6_i  = {1'b1, sp[6][17:16], sp[6][8+sp6_x], sp[6][sp6_x]},
+    sp7_i  = {1'b1, sp[7][17:16], sp[7][8+sp7_x], sp[7][sp7_x]};
 
 // Спрайт перед фоном (=0) или за фоном (=1)
 wire
@@ -202,7 +202,7 @@ wire showsp = ctrl1[4] && (ctrl1[2] || ctrl1[2] == 0 && rx >= 8);
 
 // -- Слой 0: Задний план :: ctrl1[3] =1 Фон отображается
 wire [1:0]  back_a = {bgtile[{1'b1, ~finex}], bgtile[{1'b0, ~finex}]};
-wire [4:0]  back_b = back_a && showbg ? {bgattr[1:0], back_a} : 5'b0_00_00;
+wire [4:0]  back_b = back_a && showbg ? {1'b0, bgattr[1:0], back_a} : 5'b0_00_00;
 
 // -- Слой 1: Спрайты :: ctrl1[4] =1 Спрайты отображаются
 wire [4:0]  pipe_0 = (showsp && oam_id >= 1 && sp0_b && sp0_u && sp0_i[1:0]) ? sp0_i : back_b;
@@ -214,7 +214,7 @@ wire [4:0]  pipe_5 = (showsp && oam_id >= 6 && sp5_b && sp5_u && sp5_i[1:0]) ? s
 wire [4:0]  pipe_6 = (showsp && oam_id >= 7 && sp6_b && sp6_u && sp6_i[1:0]) ? sp6_i : pipe_5;
 wire [4:0]  pipe_7 = (showsp && oam_id >= 8 && sp7_b && sp7_u && sp7_i[1:0]) ? sp7_i : pipe_6;
 
-//-- Слой 2: Итоговый цвет
+//-- Слой 2: Итоговый цвет (палитра фона или спрайтов в pipe_7[4])
 wire [5:0]  dst    = bgpal[ pipe_7[4:0] ];
 
 // Процессор
@@ -395,7 +395,7 @@ begin
                 // Тест первого (0-го спрайта)
                 if (oama == 4 && {sp_chrd, sp[oam_id][7:0]}) oam_hit <= 1;
 
-                sp[oam_id][ 15:8] <= sp_chrd; // BGTop
+                sp[oam_id][15:8] <= sp_chrd; // BGTop
 
             end
 
@@ -696,7 +696,7 @@ begin
                     16'b001x_xxxx_xxxx_xxxx: case (cpu_a[2:0])
 
                         // Запись или чтение OAM
-                        4: if (cpu_r) cpu_i <= oam2i;
+                        4: if (cpu_r) cpu_i <= {oam2i[7:5], 3'b000, oam2i[1:0]};
 
                         // Чтение из памяти байта
                         7: if (cpu_r && va < 16'h3F00) vidch <= vidi;

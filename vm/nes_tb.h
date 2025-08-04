@@ -57,7 +57,7 @@ protected:
     int         mapper      = 0;
     int         mapper_chrw = 1;
     int         mapper_cw   = 0;
-    int         mapper_nt   = 3;
+    int         mapper_nt   = 1;        // Крайне важно выставлять правильно
     int         prg_bank    = 0;
     int         _cpu_m0     = 0;
 
@@ -216,6 +216,9 @@ public:
                 pticks = SDL_GetTicks();
 
             } while (pticks - ticks < frame_length);
+
+            // Отладка OAM
+            // for (int i = 0; i < 256; i++) printf("%02x:%02x ", i, oam[i]); printf("\n");
 
             SDL_UpdateTexture       (sdl_screen_texture, NULL, screen_buffer, width * sizeof(Uint32));
             SDL_SetRenderDrawColor  (sdl_renderer, 0, 0, 0, 0);
